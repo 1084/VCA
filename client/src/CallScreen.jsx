@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { socket, initials, gradFor } from './lib';
 import useMesh from './useMesh';
 import Workspace from './collab/Workspace';
@@ -18,8 +18,15 @@ function Tile({ name, stream, showVideo, micOn, hand, me, mirror, sharing, onPla
   const ref = useRef(null);
   useEffect(() => {
     if (!ref.current) return;
-    ref.current.srcObject = stream || null;
-    if (stream) {
+    // Only touch srcObject when the stream truly changed. Reassigning the
+    // same stream makes the element blink black — and since this effect
+    // can re-run on unrelated re-renders (the call timer ticks every
+    // second), an unconditional assignment flashes the video once per
+    // second, in time with the clock.
+    if (ref.current.srcObject !== (stream || null)) {
+      ref.current.srcObject = stream || null;
+    }
+    if (stream && ref.current.paused) {
       // Safari blocks unmuted autoplay until a user gesture; surface it
       // instead of failing silently (the classic "no remote audio" bug).
       ref.current.play().catch(() => onPlayBlocked?.());
@@ -70,6 +77,7 @@ export default function CallScreen({ session, call, onLeave }) {
   const [toastMsg, setToastMsg] = useState('');
   const [floats, setFloats] = useState([]);
   const [playBlocked, setPlayBlocked] = useState(false);
+  const onPlayBlocked = useCallback(() => setPlayBlocked(true), []);
   const unblockPlayback = () => {
     document.querySelectorAll('.call video').forEach((v) => v.play().catch(() => {}));
     setPlayBlocked(false);
@@ -193,7 +201,9 @@ export default function CallScreen({ session, call, onLeave }) {
       return;
     }
     try {
-      const vs = await navigator.mediaDevices.getUserMedia({ video: true });
+      const vs = await navigator.mediaDevices.getUserMedia({
+        video: call.camId ? { deviceId: { ideal: call.camId } } : true
+      });
       const track = vs.getVideoTracks()[0];
       let ls = mesh.localStreamRef.current;
       if (!ls) {
@@ -286,7 +296,7 @@ export default function CallScreen({ session, call, onLeave }) {
             <Tile key={id} name={p.name} stream={p.stream}
               showVideo={!!p.stream && (p.camOn || p.sharing)}
               micOn={p.micOn} hand={p.hand} sharing={p.sharing}
-              onPlayBlocked={() => setPlayBlocked(true)} />
+              onPlayBlocked={onPlayBlocked} />
           ))}
         </div>
 

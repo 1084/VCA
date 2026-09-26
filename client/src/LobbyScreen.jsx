@@ -8,18 +8,41 @@ export default function LobbyScreen({ email, onJoin }) {
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const [joining, setJoining] = useState(false);
+  const [devices, setDevices] = useState({ cams: [], mics: [] });
+  const [camId, setCamId] = useState('');
+  const [micId, setMicId] = useState('');
   const previewRef = useRef(null);
   const previewStream = useRef(null);
   const grad = gradFor(name);
 
+  // Device labels are only revealed after a permission grant, so this runs
+  // on mount (covers returning users) and again after the camera turns on.
+  const refreshDevices = async () => {
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices();
+      setDevices({
+        cams: list.filter((d) => d.kind === 'videoinput'),
+        mics: list.filter((d) => d.kind === 'audioinput')
+      });
+    } catch { /* enumeration unsupported — dropdowns just stay hidden */ }
+  };
+  useEffect(() => { refreshDevices(); }, []);
+
+  const camConstraint = (id) => (id ? { deviceId: { ideal: id } } : true);
+
+  const startPreview = async (id) => {
+    previewStream.current?.getTracks().forEach((t) => t.stop());
+    const s = await navigator.mediaDevices.getUserMedia({ video: camConstraint(id) });
+    previewStream.current = s;
+    setCamOn(true);
+    requestAnimationFrame(() => {
+      if (previewRef.current) previewRef.current.srcObject = s;
+    });
+    refreshDevices();
+  };
   const tryCamera = async () => {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: true });
-      previewStream.current = s;
-      setCamOn(true);
-      requestAnimationFrame(() => {
-        if (previewRef.current) previewRef.current.srcObject = s;
-      });
+      await startPreview(camId);
     } catch {
       setErr('Camera unavailable — you can still join without video.');
     }
@@ -28,6 +51,16 @@ export default function LobbyScreen({ email, onJoin }) {
     previewStream.current?.getTracks().forEach((t) => t.stop());
     previewStream.current = null;
     setCamOn(false);
+  };
+  const pickCam = async (id) => {
+    setCamId(id);
+    if (!camOn) return;
+    try {
+      await startPreview(id);
+    } catch {
+      setErr('Could not switch to that camera.');
+      cameraOff();
+    }
   };
   useEffect(() => () => previewStream.current?.getTracks().forEach((t) => t.stop()), []);
 
@@ -39,10 +72,14 @@ export default function LobbyScreen({ email, onJoin }) {
     previewStream.current?.getTracks().forEach((t) => t.stop());
     previewStream.current = null;
 
-    // Get the real call stream: try mic+cam per the toggles, degrade gracefully.
+    // Get the real call stream with the chosen devices; degrade gracefully.
+    const audio = micId ? { deviceId: { ideal: micId } } : true;
     let stream = null;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: camOn });
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio,
+        video: camOn ? camConstraint(camId) : false
+      });
     } catch {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -52,9 +89,16 @@ export default function LobbyScreen({ email, onJoin }) {
     }
     if (stream && !micOn) stream.getAudioTracks().forEach((t) => (t.enabled = false));
     const hasVideo = !!stream?.getVideoTracks().length;
-    if (hasVideo && !camOn) stream.getVideoTracks().forEach((t) => (t.enabled = false));
-    onJoin({ roomId: id, stream, micOn: micOn && !!stream, camOn: camOn && hasVideo });
+    onJoin({
+      roomId: id,
+      stream,
+      micOn: micOn && !!stream,
+      camOn: camOn && hasVideo,
+      camId
+    });
   };
+
+  const label = (d, i, kind) => d.label || `${kind} ${i + 1}`;
 
   return (
     <section className="screen lobby">
@@ -94,6 +138,27 @@ export default function LobbyScreen({ email, onJoin }) {
               {camOn ? 'Camera is on' : 'Camera is off'}
             </button>
           </div>
+          {(devices.cams.length > 0 || devices.mics.length > 0) && (
+            <div className="device-row">
+              <select value={camId} onChange={(e) => pickCam(e.target.value)} aria-label="Camera">
+                <option value="">Default camera</option>
+                {devices.cams.map((d, i) => (
+                  <option key={d.deviceId || i} value={d.deviceId}>{label(d, i, 'Camera')}</option>
+                ))}
+              </select>
+              <select value={micId} onChange={(e) => setMicId(e.target.value)} aria-label="Microphone">
+                <option value="">Default microphone</option>
+                {devices.mics.map((d, i) => (
+                  <option key={d.deviceId || i} value={d.deviceId}>{label(d, i, 'Microphone')}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {devices.cams.length > 0 && !devices.cams.some((d) => d.label) && (
+            <p style={{ fontSize: 12, color: 'var(--muted)' }}>
+              Turn on the camera once to see device names.
+            </p>
+          )}
         </div>
         <div className="join-panel">
           <h2>Ready when you are.</h2>
