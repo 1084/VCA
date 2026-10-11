@@ -30,10 +30,10 @@
    reveal whether an account exists, inputs are type-checked before touching
    the database, and sessions last 24h (TOKEN_TTL). `trust proxy` is set so
    rate limiting sees real client IPs behind Render's proxy.
-6. **TURN support**: set VITE_TURN_URLS / VITE_TURN_USERNAME /
-   VITE_TURN_CREDENTIAL at client build time to add a relay for the
-   ~10-20% of networks where direct peer connections fail. STUN-only is
-   fine on a LAN; do not invite real testers without TURN.
+6. **TURN support**: the server mints a one-hour relay credential per room
+   join from Cloudflare Realtime TURN (`GET /api/turn`, signed-in users only,
+   rate-limited). Set CF_TURN_KEY_ID / CF_TURN_API_TOKEN in server/.env;
+   nothing relay-related ships in the client bundle.
 7. **Multi-file Code tab**: a shared file tree per room. Create, upload,
    rename, and delete files; everyone sees the same tree and can edit any
    file simultaneously with named cursors. Data model: `ydoc.getMap('files')`

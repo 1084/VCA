@@ -2,19 +2,26 @@ import { io } from 'socket.io-client';
 
 export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
-// ICE servers. STUN alone connects most peers directly; a TURN relay is
-// what rescues the ~10-20% behind strict NATs/firewalls. Configure one
-// before real-world testing (see client/.env.example).
-const stun = { urls: 'stun:stun.l.google.com:19302' };
-const turnUrls = (import.meta.env.VITE_TURN_URLS || '')
-  .split(',').map((u) => u.trim()).filter(Boolean);
-export const ICE_SERVERS = turnUrls.length
-  ? [stun, {
-      urls: turnUrls,
-      username: import.meta.env.VITE_TURN_USERNAME || '',
-      credential: import.meta.env.VITE_TURN_CREDENTIAL || ''
-    }]
-  : [stun];
+// ICE servers. STUN alone connects most peers directly; the TURN relay that
+// rescues the ~10-20% behind strict NATs is issued by the server per room
+// join (GET /api/turn) with a short lifetime, so no relay credential ever
+// ships in this bundle. See server/turn.js.
+export const STUN_ONLY = [{ urls: 'stun:stun.l.google.com:19302' }];
+export async function fetchIceServers(token) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 4000);
+    const res = await fetch(`${BACKEND_URL}/api/turn`, {
+      headers: { authorization: `Bearer ${token}` }, signal: ctrl.signal
+    });
+    clearTimeout(t);
+    if (!res.ok) return STUN_ONLY;
+    const j = await res.json();
+    return Array.isArray(j.iceServers) && j.iceServers.length ? j.iceServers : STUN_ONLY;
+  } catch {
+    return STUN_ONLY; // a call must never be blocked on the relay
+  }
+}
 export const socket = io(BACKEND_URL, { autoConnect: false });
 
 export const initials = (n = '?') =>

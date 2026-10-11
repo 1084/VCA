@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ICE_SERVERS } from './lib';
+import { STUN_ONLY } from './lib';
 
 /**
  * WebRTC mesh: one RTCPeerConnection per remote participant.
@@ -14,7 +14,7 @@ import { ICE_SERVERS } from './lib';
  * ICE candidates that arrive before the remote description are queued and
  * flushed afterwards — without this, joins are flaky on slow networks.
  */
-export default function useMesh(socket, initialStream) {
+export default function useMesh(socket, initialStream, iceServersRef) {
   const [peers, setPeers] = useState({}); // id -> {name, stream, micOn, camOn, hand, sharing}
   const entriesRef = useRef({}); // id -> {pc, polite, makingOffer, ignoreOffer, queued, videoSender, stream}
   const localStreamRef = useRef(initialStream);
@@ -35,7 +35,7 @@ export default function useMesh(socket, initialStream) {
       if (name) patch(id, { name });
       return entry;
     }
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({ iceServers: iceServersRef?.current || STUN_ONLY });
     entry = {
       pc,
       polite: socket.id < id, // opposite on the other side — both agree

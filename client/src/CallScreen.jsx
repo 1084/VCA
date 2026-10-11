@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { socket, initials, gradFor } from './lib';
+import { socket, initials, gradFor, STUN_ONLY, fetchIceServers } from './lib';
 import useMesh from './useMesh';
 import Workspace from './collab/Workspace';
 
@@ -96,7 +96,10 @@ export default function CallScreen({ session, call, onLeave }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const mesh = useMesh(socket, call.stream);
+  // Relay credentials are fetched right before joining (see lib.js); the ref
+  // lets peer connections created later pick them up without re-rendering.
+  const iceRef = useRef(STUN_ONLY);
+  const mesh = useMesh(socket, call.stream, iceRef);
   const stateRef = useRef({});
   stateRef.current = { micOn, camOn, hand, sharing };
   const shareTrackRef = useRef(null);
@@ -113,7 +116,10 @@ export default function CallScreen({ session, call, onLeave }) {
   // ---- lifetime: socket wiring ----
   useEffect(() => {
     socket.auth = { token };
-    socket.connect();
+    // Get a short-lived TURN credential first (≈100 ms, falls back to STUN on
+    // any failure), then connect — so every peer connection has the relay.
+    let alive = true; // don't connect if the user left before the credential arrived
+    fetchIceServers(token).then((ice) => { if (!alive) return; iceRef.current = ice; socket.connect(); });
 
     const onConnect = () => { socket.emit('join', roomId); sendState(); };
     const onPeers = (list) => list.forEach(({ id, name }) => mesh.ensure(id, name));
@@ -160,6 +166,7 @@ export default function CallScreen({ session, call, onLeave }) {
       socket.off('room-full', onFull);
       socket.off('connect_error', onAuthErr);
       mesh.closeAll();
+      alive = false;
       socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

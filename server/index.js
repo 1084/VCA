@@ -115,6 +115,10 @@ app.post('/api/login', authLimiter, async (req, res) => {
   }
 });
 
+// ---- TURN credentials (short-lived, per signed-in user) ----
+const { attachTurn } = require('./turn');
+attachTurn(app, { verifyToken: (t) => jwt.verify(t, SECRET) });
+
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error('Unauthorized'));
