@@ -180,42 +180,105 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .cm-editor.cm-focused{outline:none}
 .cm-scroller{font-family:var(--font-mono)!important;line-height:1.65}
 
-@media(max-width:760px){
+/* "Phone" = narrow OR short. A phone held sideways is ~850px wide but only
+   ~390px tall, which the desktop layout can't fit — it needs theater mode too. */
+@media(max-width:760px),(max-height:500px){
   .auth-left{display:none}
-  /* Phone: a panel never covers video. The call body stacks vertically —
-     the stage keeps a fixed slice at the top (tiles shrink to a compact
-     grid that scrolls), and the panel takes the remaining height below it,
-     scrolling its own messages. Nothing overlays the tiles. */
-  .call-body:has(.panel){flex-direction:column}
-  .call-body:has(.panel) .stage{
-    flex:0 0 38dvh;align-content:start;overflow-y:auto;
-    grid-template-columns:repeat(2,1fr);grid-auto-rows:minmax(100px,1fr);
-    padding:8px;gap:8px}
-  .call-body:has(.panel) .tile{min-height:0}
-  .call-body:has(.panel) .tile .avatar{width:44px;height:44px;font-size:16px}
-  .call-body:has(.panel) .tile .nameplate{font-size:11px;padding:3px 7px;left:6px;bottom:6px}
-  .panel{position:static;width:auto;flex:1;min-height:0;
-    border-left:none;border-top:1px solid var(--line)}
-  .panel-head{padding:10px 16px}
-  .panel-head button{padding:6px 10px;font-size:22px} /* bigger tap target to close */
-  .panel-body{padding:12px 16px}
-  .chat-input{padding:10px 12px}
-  .chat-input input{font-size:16px} /* <16px makes iOS auto-zoom the page on focus */
-  .controls{gap:7px;padding:10px 8px calc(10px + env(safe-area-inset-bottom))}
-  .ctl{min-width:44px;padding:9px 10px}
-  .ctl span{display:none}
-  .ctl svg{width:18px;height:18px}
-  .ctl-leave{padding:11px 14px;margin-left:0;font-size:13px}
-  .call-top{padding:10px 12px;gap:8px}
+
+  /* ===== PHONE "THEATER MODE" =====
+     Video owns the whole screen; everything else floats over it as
+     translucent glass. Nothing ever shrinks or covers the video with a
+     solid block — chat is a transparent lane fading into the picture,
+     controls are weightless icons. (Desktop layout is untouched.) */
+  .call{position:relative;background:#000}
+  .call-body{position:absolute;inset:0;display:block}
+  .stage{position:absolute;inset:0;display:grid;padding:0;gap:2px;
+    grid-template-columns:1fr;grid-auto-rows:1fr;
+    align-content:stretch;background:#000;overflow:hidden}
+  /* 1-2 people: full-height rows. 3+: two columns so faces stay large. */
+  .stage:has(.tile:nth-child(3)){grid-template-columns:1fr 1fr}
+  @media(orientation:landscape){
+    .stage{grid-template-columns:repeat(auto-fit,minmax(45%,1fr))}
+    .stage:has(.tile:nth-child(3)){grid-template-columns:repeat(auto-fit,minmax(30%,1fr))}
+  }
+  /* keep nameplates clear of the floating controls */
+  .tile .nameplate{bottom:auto;top:calc(52px + env(safe-area-inset-top))}
+  .tile:nth-child(n+2) .nameplate{top:10px}
+  .call-body.ws .tile .nameplate{top:6px;left:6px}
+  .tile{border-radius:0;border:none;min-height:0;background:var(--ink)}
+  .tile .avatar{width:72px;height:72px;font-size:26px}
+  .tile .nameplate{font-size:11.5px}
+
+  /* Floating top chip */
+  .call-top{position:absolute;top:0;left:0;right:0;z-index:20;border:none;
+    padding:calc(8px + env(safe-area-inset-top)) 10px 8px;
+    background:linear-gradient(rgba(0,0,0,.55),transparent)}
   .call-top .mark{display:none}
-  .stage{padding:10px;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-  .tile{min-height:110px}
-  .call-body.ws{flex-direction:column}
-  .call-body.ws .stage{display:grid;flex:0 0 22dvh;grid-template-columns:repeat(3,1fr);
-    grid-auto-rows:1fr;overflow-y:auto;padding:8px;gap:8px}
-  .call-body.ws .tile{aspect-ratio:auto;min-height:0}
-  .workspace{border-left:none;border-top:1px solid var(--line)}
+  .room-chip{background:rgba(12,21,24,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:12px;padding:6px 10px}
+  .call-top .timer{color:rgba(232,239,240,.85);text-shadow:0 1px 3px rgba(0,0,0,.6)}
+
+  /* Floating glass controls */
+  .controls{position:absolute;left:0;right:0;bottom:0;z-index:30;border:none;
+    flex-wrap:nowrap;justify-content:flex-start;gap:8px;overflow-x:auto;scrollbar-width:none;
+    padding:8px 10px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(transparent,rgba(0,0,0,.6))}
+  .controls::-webkit-scrollbar{display:none}
+  .ctl{flex-shrink:0}
+  .ctl-leave{position:sticky;right:0;margin-left:auto;box-shadow:-10px 0 14px rgba(0,0,0,.45)}
+  .ctl{min-width:44px;width:44px;height:44px;padding:0;border-radius:50%;justify-content:center;
+    background:rgba(12,21,24,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(232,239,240,.14)}
+  .ctl span{display:none}
+  .ctl svg{width:19px;height:19px}
+  .ctl.off{background:rgba(255,92,92,.3);border-color:rgba(255,92,92,.5)}
+  .ctl.active{background:rgba(255,180,84,.3);border-color:rgba(255,180,84,.55)}
+  .ctl-leave{width:auto;height:44px;padding:0 16px;border-radius:22px;font-size:13px;
+    background:var(--red);border-color:var(--red)}
+
+  /* Chat: a transparent overlay lane on the lower third. Messages scroll
+     and fade out upward into the video; the input floats above the controls. */
+  .panel{position:absolute;left:0;right:0;bottom:0;top:auto;width:auto;z-index:25;
+    height:min(55dvh,460px);background:transparent;border:none;
+    padding-bottom:calc(70px + env(safe-area-inset-bottom));pointer-events:none}
+  .panel-head{padding:0 12px 4px;border:none;pointer-events:auto;
+    background:none;justify-content:flex-end}
+  .panel-head h3{display:none}
+  .panel-head button{width:32px;height:32px;border-radius:50%;font-size:18px;color:var(--text);
+    background:rgba(12,21,24,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(232,239,240,.14);display:flex;align-items:center;justify-content:center}
+  .panel-body{padding:8px 12px;gap:6px;justify-content:flex-end;pointer-events:none;
+    -webkit-mask-image:linear-gradient(transparent,#000 22%);mask-image:linear-gradient(transparent,#000 22%)}
+  .msg{max-width:78%;pointer-events:auto}
+  .msg .who{font-size:11px;margin-bottom:1px;text-shadow:0 1px 3px rgba(0,0,0,.8);color:rgba(232,239,240,.8)}
+  .msg .bubble{font-size:13px;padding:7px 11px;border-radius:12px;
+    background:rgba(12,21,24,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border:1px solid rgba(232,239,240,.12)}
+  .msg.me .bubble{background:rgba(255,180,84,.28);border-color:rgba(255,180,84,.35)}
+  .chat-input{padding:6px 12px 0;border:none;background:none;pointer-events:auto}
+  .chat-input input{font-size:16px;border-radius:22px;padding:11px 16px;
+    background:rgba(12,21,24,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(232,239,240,.18)}
+  .chat-input .send{border-radius:22px;padding:0 16px}
+  /* People list reuses the lane with readable rows */
+  .p-item{padding:7px 11px;border-radius:12px;background:rgba(12,21,24,.55);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(232,239,240,.12)}
+
+  /* Workspace on a phone: a sheet over the lower part, with a filmstrip
+     of participants kept visible above it. */
+  .call-body.ws .stage{bottom:auto;height:24dvh;top:0;
+    grid-template-columns:repeat(3,1fr);padding-top:calc(44px + env(safe-area-inset-top))}
+  .call-body.ws .tile{aspect-ratio:auto}
+  .workspace{position:absolute;left:0;right:0;top:24dvh;bottom:0;display:flex;
+    border-left:none;border-top:1px solid var(--line);background:var(--ink);
+    padding-bottom:calc(70px + env(safe-area-inset-bottom))}
   .ftree{width:140px}
+
+  @media(orientation:landscape){
+    .panel{left:auto;width:min(60vw,420px);height:calc(100dvh - 8px)}
+    .panel-head{padding-top:calc(8px + env(safe-area-inset-top))}
+    .call-body.ws .stage{height:100dvh;bottom:0;width:34vw;grid-template-columns:1fr;padding-top:calc(44px + env(safe-area-inset-top))}
+    .workspace{top:0;left:34vw;border-top:none;border-left:1px solid var(--line)}
+  }
 }
 
 /* Safari autoplay-recovery prompt */
