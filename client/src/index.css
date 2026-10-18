@@ -182,7 +182,17 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 
 @media(max-width:760px){
   .auth-left{display:none}
-  .panel{position:fixed;right:0;top:0;bottom:0;z-index:60;width:min(320px,88vw)}
+  /* Phone: side panels become a bottom sheet sized to the VISIBLE viewport
+     (dvh), so the message input never hides behind the URL bar. */
+  .panel{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:60;width:auto;
+    height:70vh;height:70dvh;max-height:calc(100dvh - 56px);
+    border-left:none;border-top:1px solid var(--line);border-radius:16px 16px 0 0;
+    box-shadow:0 -12px 40px rgba(0,0,0,.45)}
+  .panel-head{padding:12px 16px}
+  .panel-head button{padding:6px 10px;font-size:22px} /* bigger tap target to close */
+  .panel-body{padding:12px 16px}
+  .chat-input{padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+  .chat-input input{font-size:16px} /* <16px makes iOS auto-zoom the page on focus */
   .controls{gap:7px;padding:10px 8px calc(10px + env(safe-area-inset-bottom))}
   .ctl{min-width:44px;padding:9px 10px}
   .ctl span{display:none}
