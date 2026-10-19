@@ -301,6 +301,7 @@ input{font-family:inherit;font-size:inherit;color:inherit}
   .call.phone .call-body.ws .stage{bottom:auto;height:calc(150px + env(safe-area-inset-top));top:0;display:flex;gap:6px;
     overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding:calc(48px + env(safe-area-inset-top)) 10px 8px}
   .call.phone .call-body.ws .stage::-webkit-scrollbar{display:none}
+  .call.phone .call-body.ws .workspace{display:flex}
   .call.phone .call-body.ws .tile{flex:0 0 118px;aspect-ratio:auto;border-radius:10px}
   .call.phone .call-body.ws .tile .avatar{width:40px;height:40px;font-size:15px}
   .call.phone .call-body.ws .tile .nameplate{top:auto;bottom:6px;left:6px;font-size:10.5px;padding:3px 7px}
@@ -320,7 +321,7 @@ input{font-family:inherit;font-size:inherit;color:inherit}
   .ph-bottom .poll.compact .poll-opt{padding:6px 10px;font-size:13px}
   .call.phone .workspace{width:auto;background:var(--ink)}
   .ph-sheet .poll{margin-bottom:8px}
-  .call.phone .workspace{position:absolute;left:0;right:0;top:calc(194px + env(safe-area-inset-top));bottom:0;display:flex;z-index:10;
+  .call.phone .workspace{position:absolute;left:0;right:0;top:calc(194px + env(safe-area-inset-top));bottom:0;display:none;z-index:10;
     border-left:none;border-top:1px solid var(--line);background:var(--ink);
     padding-bottom:calc(126px + env(safe-area-inset-bottom))}
 
