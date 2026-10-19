@@ -83,9 +83,61 @@ function attachSignaling(io, { maxRoomSize = 10 } = {}) {
       io.in(roomId).emit('reaction', { from: displayName(), emoji });
     });
 
+    // ---- Polls ("Ask the room") ----
+    // The server is the referee: it owns the poll, counts one vote per
+    // socket (last vote wins), and broadcasts tallies — so nobody can stuff
+    // a poll from the client. Polls live only in memory with the room.
+    const polls = () => {
+      const roomId = socket.data.roomId;
+      const room = io.sockets.adapter.rooms.get(roomId);
+      if (!room) return null;
+      room.__polls ||= new Map(); // pollId -> {id, by, byName, question, options, votes: Map(socketId -> optionIdx), open, ts}
+      return room.__polls;
+    };
+    const tally = (poll) => {
+      const counts = poll.options.map(() => 0);
+      for (const idx of poll.votes.values()) counts[idx]++;
+      return { id: poll.id, by: poll.by, byName: poll.byName, question: poll.question,
+        options: poll.options, counts, total: poll.votes.size, open: poll.open, ts: poll.ts };
+    };
+    socket.on('poll', (p) => {
+      const roomId = socket.data.roomId, store = polls();
+      if (!roomId || !store) return;
+      const question = typeof p?.question === 'string' ? p.question.trim().slice(0, 200) : '';
+      const options = Array.isArray(p?.options)
+        ? [...new Set(p.options.filter((o) => typeof o === 'string').map((o) => o.trim().slice(0, 60)).filter(Boolean))].slice(0, 5)
+        : [];
+      if (!question || options.length < 2) return;
+      if ([...store.values()].filter((x) => x.open).length >= 3) return; // no poll pile-ups
+      const poll = { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+        by: socket.id, byName: displayName(), question, options, votes: new Map(), open: true, ts: Date.now() };
+      store.set(poll.id, poll);
+      if (store.size > 20) store.delete(store.keys().next().value);
+      io.in(roomId).emit('poll', tally(poll));
+    });
+    socket.on('poll-vote', ({ id, option } = {}) => {
+      const roomId = socket.data.roomId, store = polls();
+      const poll = store?.get(id);
+      if (!roomId || !poll || !poll.open) return;
+      if (!Number.isInteger(option) || option < 0 || option >= poll.options.length) return;
+      poll.votes.set(socket.id, option);
+      io.in(roomId).emit('poll', tally(poll));
+    });
+    socket.on('poll-close', ({ id } = {}) => {
+      const roomId = socket.data.roomId, store = polls();
+      const poll = store?.get(id);
+      if (!roomId || !poll || poll.by !== socket.id) return; // only the asker closes it
+      poll.open = false;
+      io.in(roomId).emit('poll', tally(poll));
+    });
+
     socket.on('disconnecting', () => {
       const roomId = socket.data.roomId;
       if (roomId) socket.to(roomId).emit('peer-left', { id: socket.id });
+      const store = io.sockets.adapter.rooms.get(roomId)?.__polls;
+      if (store) for (const poll of store.values()) {
+        if (poll.open && poll.votes.delete(socket.id)) socket.to(roomId).emit('poll', tally(poll));
+      }
     });
   });
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import usePhone, { useKeyboardInset } from './usePhone';
 import { socket, initials, gradFor, STUN_ONLY, fetchIceServers } from './lib';
 import useMesh from './useMesh';
-import Workspace from './collab/Workspace';
+import Notes, { useNotesDoc, appendLine, notesText } from './collab/Notes';
 
 const Icon = {
   mic: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>,
@@ -15,8 +15,62 @@ const Icon = {
   phone: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92V20a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3.09a2 2 0 0 1 2 1.72c.12.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 10"/></svg>,
   more: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg>,
   send: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>,
-  copy: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+  copy: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+  notes: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>,
+  poll: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>,
+  save: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>,
+  shareOut: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
 };
+
+const REACTIONS = ['👍', '🎉', '❤️', '😂', '👏', '😮', '🔥'];
+
+/* A poll card: live tally, one tap to vote (last vote wins), the asker closes it. */
+function PollCard({ poll, mine, isAsker, onVote, onClose, compact }) {
+  const max = Math.max(1, ...poll.counts);
+  return (
+    <div className={`poll ${poll.open ? '' : 'closed'} ${compact ? 'compact' : ''}`}>
+      <div className="poll-q"><span>{Icon.poll}</span><b>{poll.question}</b><small>{poll.byName} · {poll.total} vote{poll.total === 1 ? '' : 's'}{poll.open ? '' : ' · closed'}</small></div>
+      {poll.options.map((o, i) => (
+        <button key={i} className={`poll-opt ${mine === i ? 'mine' : ''}`} disabled={!poll.open} onClick={() => onVote(i)}>
+          <i style={{ width: `${(poll.counts[i] / max) * 100}%` }} />
+          <span>{o}</span><b>{poll.counts[i]}</b>
+        </button>
+      ))}
+      {poll.open && isAsker && <button className="poll-close" onClick={onClose}>Close poll</button>}
+    </div>
+  );
+}
+
+/* "Ask the room": a question and 2–5 answers; Yes / No / Not sure is one tap. */
+function PollComposer({ onAsk, onCancel }) {
+  const [q, setQ] = useState('');
+  const [opts, setOpts] = useState(['Yes', 'No', 'Not sure']);
+  const set = (i, v) => setOpts((o) => o.map((x, k) => (k === i ? v : x)));
+  const valid = q.trim() && opts.filter((o) => o.trim()).length >= 2;
+  return (
+    <div className="poll-compose">
+      <h3>Ask the room</h3>
+      <input autoFocus placeholder="Question, e.g. Move the meeting to Tuesday?" value={q} maxLength={200} onChange={(e) => setQ(e.target.value)} />
+      <div className="poll-presets">
+        <button onClick={() => setOpts(['Yes', 'No', 'Not sure'])}>Yes / No / Not sure</button>
+        <button onClick={() => setOpts(['Agree', 'Disagree'])}>Agree / Disagree</button>
+        <button onClick={() => setOpts(['A', 'B', 'C'])}>A / B / C</button>
+      </div>
+      {opts.map((o, i) => (
+        <div key={i} className="poll-optrow">
+          <input value={o} maxLength={60} placeholder={`Answer ${i + 1}`} onChange={(e) => set(i, e.target.value)} />
+          {opts.length > 2 && <button aria-label="Remove answer" onClick={() => setOpts((x) => x.filter((_, k) => k !== i))}>×</button>}
+        </div>
+      ))}
+      {opts.length < 5 && <button className="wb-btn" onClick={() => setOpts((x) => [...x, ''])}>＋ Answer</button>}
+      <div style={{ display: 'flex', marginTop: 12, gap: 8 }}>
+        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" style={{ flex: 2 }} disabled={!valid}
+          onClick={() => onAsk(q.trim(), opts.map((x) => x.trim()).filter(Boolean))}>Ask</button>
+      </div>
+    </div>
+  );
+}
 
 function Tile({ name, stream, showVideo, micOn, hand, me, mirror, sharing, onPlayBlocked }) {
   const ref = useRef(null);
@@ -75,7 +129,13 @@ export default function CallScreen({ session, call, onLeave }) {
   const [panel, setPanel] = useState(null); // 'chat' | 'people' | null (desktop side panels)
   const phone = usePhone();          // narrow or short viewport → theater layout
   const kb = useKeyboardInset();     // on-screen keyboard height (0 on desktop)
-  const [sheet, setSheet] = useState(null); // phone: 'more' | 'people' | null
+  const [sheet, setSheet] = useState(null); // phone: 'more' | 'people' | 'ask' | null
+  const [askOpen, setAskOpen] = useState(false); // desktop poll composer
+  const [polls, setPolls] = useState({});    // id -> tally from the server
+  const [myVotes, setMyVotes] = useState({}); // pollId -> option index
+  const handSince = useRef({});               // peer id -> when the hand went up (for the queue)
+  const notes = useNotesDoc(roomId, token, email);
+  const notesRef = useRef(null); notesRef.current = notes.doc;
   const [wsOn, setWsOn] = useState(false);
   const [wsEverOn, setWsEverOn] = useState(false);
   const [msgs, setMsgs] = useState([]);
@@ -134,7 +194,20 @@ export default function CallScreen({ session, call, onLeave }) {
     const onDesc = ({ from, description }) => mesh.onDescription(from, description);
     const onCand = ({ from, candidate }) => mesh.onCandidate(from, candidate);
     const onLeft = ({ id }) => mesh.remove(id);
-    const onState = ({ from, ...s }) => mesh.setPeerState(from, s);
+    const onState = ({ from, ...s }) => {
+      if (s.hand && !handSince.current[from]) handSince.current[from] = Date.now();
+      if (!s.hand) delete handSince.current[from];
+      mesh.setPeerState(from, s);
+    };
+    const onPoll = (t) => setPolls((prev) => {
+      const was = prev[t.id];
+      if (was?.open && !t.open) {
+        // closed: a line in chat for everyone, and into the notes by the asker
+        setMsgs((m) => [...m.slice(-199), { id: 'poll', from: 'Poll', text: `${t.question} — ${t.options.map((o, i) => `${o} ${t.counts[i]}`).join(' · ')}`, ts: Date.now() }]);
+        if (t.by === socket.id) appendLine(notesRef.current, `Poll: ${t.question} → ${t.options.map((o, i) => `${o} ${t.counts[i]}`).join(', ')} (${t.total} votes)`);
+      }
+      return { ...prev, [t.id]: t };
+    });
     const onChat = (m) => setMsgs((prev) => [...prev.slice(-199), m]);
     const onReaction = ({ emoji }) =>
       setFloats((f) => [...f, { id: Math.random(), emoji, left: 42 + Math.random() * 16 }]);
@@ -150,6 +223,7 @@ export default function CallScreen({ session, call, onLeave }) {
     socket.on('peer-state', onState);
     socket.on('chat', onChat);
     socket.on('reaction', onReaction);
+    socket.on('poll', onPoll);
     socket.on('room-full', onFull);
     socket.on('connect_error', onAuthErr);
 
@@ -170,6 +244,7 @@ export default function CallScreen({ session, call, onLeave }) {
       socket.off('peer-state', onState);
       socket.off('chat', onChat);
       socket.off('reaction', onReaction);
+      socket.off('poll', onPoll);
       socket.off('room-full', onFull);
       socket.off('connect_error', onAuthErr);
       mesh.closeAll();
@@ -267,6 +342,7 @@ export default function CallScreen({ session, call, onLeave }) {
 
   const toggleHand = () => {
     const v = !hand;
+    if (v) handSince.current[socket.id] = Date.now(); else delete handSince.current[socket.id];
     setHand(v);
     sendState({ hand: v });
     if (v) toast('Hand raised');
@@ -285,12 +361,42 @@ export default function CallScreen({ session, call, onLeave }) {
     const v = !wsOn;
     setWsOn(v);
     if (v && !wsEverOn) setWsEverOn(true);
-    if (v) toast('Workspace open — shared with everyone in the room');
+    if (v && !wsEverOn) toast('Notes are shared with everyone in the room');
   };
+
+  const peerList = Object.entries(mesh.peers);
+  const ask = (question, options) => { socket.emit('poll', { question, options }); setSheet(null); setAskOpen(false); };
+  const vote = (id, option) => { socket.emit('poll-vote', { id, option }); setMyVotes((v) => ({ ...v, [id]: option })); };
+  const closePoll = (id) => socket.emit('poll-close', { id });
+  const openPolls = Object.values(polls).filter((p) => p.open).sort((a, b) => a.ts - b.ts);
+
+  // Notes leave the room as plain text: share sheet where there is one,
+  // otherwise a .txt download (on iOS the share sheet includes Save to Files).
+  const exportText = () => {
+    const names = [me, ...peerList.map(([, p]) => p.name)];
+    const closed = Object.values(polls).filter((p) => !p.open);
+    return [`Cove · room ${roomId} · ${new Date().toLocaleString()}`, `With: ${names.join(', ')}`, '',
+      notesText(notes.doc).trim() || '(no notes)',
+      ...(closed.length ? ['', 'Polls:', ...closed.map((p) => `• ${p.question} → ${p.options.map((o, i) => `${o} ${p.counts[i]}`).join(', ')}`)] : [])
+    ].join('\n');
+  };
+  const downloadNotes = () => {
+    const blob = new Blob([exportText()], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `cove-${roomId}-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('Notes saved');
+  };
+  const shareNotes = async () => {
+    const text = exportText();
+    if (navigator.share) { try { await navigator.share({ title: `Cove notes · ${roomId}`, text }); return; } catch { /* cancelled */ return; } }
+    try { await navigator.clipboard.writeText(text); toast('Notes copied'); } catch { downloadNotes(); }
+  };
+  const handQueue = [[socket.id, { name: me, hand }], ...peerList].filter(([, p]) => p.hand)
+    .sort((a, b) => (handSince.current[a[0]] || 0) - (handSince.current[b[0]] || 0));
 
   const mm = String((seconds / 60) | 0).padStart(2, '0');
   const ss = String(seconds % 60).padStart(2, '0');
-  const peerList = Object.entries(mesh.peers);
   const localTileStream = sharing ? shareStream : localStream;
 
   const tiles = (
@@ -343,13 +449,17 @@ export default function CallScreen({ session, call, onLeave }) {
 
         <div className={`call-body ${wsOn ? 'ws' : ''}`}>
           <div className="stage">{tiles}</div>
-          {wsEverOn && <Workspace roomId={roomId} token={token} email={email} />}
+          {wsEverOn && <div className="workspace"><Notes doc={notes.doc} present={notes.present} /></div>}
         </div>
         {wsOn && (
           <div className="ph-ws-bar">
-            {Icon.grid}<b>Workspace</b><small>shared with the room</small>
-            <button onClick={() => setWsOn(false)} aria-label="Close workspace">Close</button>
+            {Icon.notes}<b>Notes</b><small>shared · saved with the room</small>
+            <button className="ghost" onClick={shareNotes} aria-label="Share notes">{Icon.shareOut}</button>
+            <button onClick={() => setWsOn(false)} aria-label="Close notes">Close</button>
           </div>
+        )}
+        {handQueue.length > 0 && !wsOn && (
+          <div className="ph-queue">✋ {handQueue.map(([, p]) => p.name).slice(0, 3).join(' → ')}{handQueue.length > 3 ? ` +${handQueue.length - 3}` : ''}</div>
         )}
 
         <div className="ph-rail" style={{ display: wsOn ? 'none' : undefined }}>
@@ -359,8 +469,8 @@ export default function CallScreen({ session, call, onLeave }) {
           <button className={`ctl ${hand ? 'active' : ''}`} onClick={toggleHand} aria-pressed={hand} aria-label="Raise hand">
             {Icon.hand}{handCount > 0 && <b className="count">{handCount}</b>}
           </button>
-          <button className="ctl" onClick={() => react('👍')} aria-label="React">
-            <span style={{ fontSize: 18, lineHeight: 1 }}>👍</span>
+          <button className={`ctl ${openPolls.length ? 'active' : ''}`} onClick={() => setSheet(sheet === 'ask' ? null : 'ask')} aria-label="Ask the room">
+            {Icon.poll}{openPolls.length > 0 && <b className="count">{openPolls.length}</b>}
           </button>
           <button className={`ctl ${sheet === 'more' ? 'active' : ''}`} onClick={() => setSheet(sheet === 'more' ? null : 'more')} aria-label="More">
             {Icon.more}
@@ -368,6 +478,10 @@ export default function CallScreen({ session, call, onLeave }) {
         </div>
 
         <div className="ph-bottom">
+          {!wsOn && openPolls.slice(-1).map((p) => (
+            <PollCard key={p.id} poll={p} mine={myVotes[p.id]} isAsker={p.by === socket.id} compact
+              onVote={(i) => vote(p.id, i)} onClose={() => closePoll(p.id)} />
+          ))}
           {!wsOn && (
             <div className="ph-chat" aria-live="polite">
               {recent.map((m, i) => (
@@ -409,15 +523,35 @@ export default function CallScreen({ session, call, onLeave }) {
                   <h3>In this room ({peerList.length + 1})</h3>
                   <div className="ph-people">{peopleRows}</div>
                 </>
+              ) : sheet === 'ask' ? (
+                openPolls.length ? (
+                  <>
+                    <h3>Polls</h3>
+                    {openPolls.map((p) => (
+                      <PollCard key={p.id} poll={p} mine={myVotes[p.id]} isAsker={p.by === socket.id}
+                        onVote={(i) => vote(p.id, i)} onClose={() => closePoll(p.id)} />
+                    ))}
+                    {openPolls.length < 3 && <button className="btn btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setSheet('ask-new')}>Ask another question</button>}
+                  </>
+                ) : <PollComposer onAsk={ask} onCancel={() => setSheet(null)} />
+              ) : sheet === 'ask-new' ? (
+                <PollComposer onAsk={ask} onCancel={() => setSheet('ask')} />
               ) : (
                 <>
                   <h3>More</h3>
+                  <button className="row" onClick={() => { setSheet(null); openWorkspace(); }}>
+                    {Icon.notes}<span>{wsOn ? 'Hide notes' : 'Notes'}</span><small>Shared with the room, saved with the room code</small>
+                  </button>
+                  <button className="row" onClick={() => { setSheet(null); shareNotes(); }}>
+                    {Icon.shareOut}<span>Share notes</span><small>Notes and poll results as text</small>
+                  </button>
+                  <button className="row" onClick={() => { setSheet(null); downloadNotes(); }}>
+                    {Icon.save}<span>Save notes to this device</span><small>.txt file</small>
+                  </button>
+                  <div className="row-emoji">{REACTIONS.map((e) => <button key={e} onClick={() => { setSheet(null); react(e); }}>{e}</button>)}</div>
                   <button className="row" onClick={() => { setSheet(null); toggleShare(); }}>
                     {Icon.share}<span>{sharing ? 'Stop sharing' : 'Share screen'}</span>
                     <small>{navigator.mediaDevices?.getDisplayMedia ? '' : 'Not on this device'}</small>
-                  </button>
-                  <button className="row" onClick={() => { setSheet(null); openWorkspace(); }}>
-                    {Icon.grid}<span>{wsOn ? 'Hide workspace' : 'Open workspace'}</span><small>Notes · Code · Whiteboard</small>
                   </button>
                   <button className="row" onClick={() => { setSheet(null); copyCode(); }}>
                     {Icon.copy}<span>Copy room code</span><small>{roomId}</small>
@@ -458,12 +592,27 @@ export default function CallScreen({ session, call, onLeave }) {
       <div className={`call-body ${wsOn ? 'ws' : ''}`}>
         <div className="stage">{tiles}</div>
 
-        {wsEverOn && <Workspace roomId={roomId} token={token} email={email} />}
+        {wsEverOn && (
+          <div className="workspace">
+            <div className="ws-head">
+              <span className="ws-title">{Icon.notes} Notes</span>
+              <span className="ws-sub">shared with the room</span>
+              <button className="wb-btn" onClick={shareNotes}>Share</button>
+              <button className="wb-btn" onClick={downloadNotes}>Save .txt</button>
+              <button className="wb-btn" onClick={() => setWsOn(false)}>Close</button>
+            </div>
+            <Notes doc={notes.doc} present={notes.present} />
+          </div>
+        )}
 
         {panel === 'chat' && (
           <aside className="panel" aria-label="Chat">
             <div className="panel-head"><h3>Chat</h3><button onClick={() => setPanel(null)} aria-label="Close chat">×</button></div>
             <div className="panel-body">
+              {openPolls.map((p) => (
+                <PollCard key={p.id} poll={p} mine={myVotes[p.id]} isAsker={p.by === socket.id}
+                  onVote={(i) => vote(p.id, i)} onClose={() => closePoll(p.id)} />
+              ))}
               {msgs.map((m, i) => (
                 <div key={i} className={`msg ${m.id === socket.id ? 'me' : ''}`}>
                   <div className="who"><b>{m.id === socket.id ? 'You' : m.from}</b></div>
@@ -503,7 +652,10 @@ export default function CallScreen({ session, call, onLeave }) {
           {Icon.share}<span>Share</span>
         </button>
         <button className={`ctl ${wsOn ? 'active' : ''}`} onClick={openWorkspace} aria-pressed={wsOn}>
-          {Icon.grid}<span>Workspace</span>
+          {Icon.notes}<span>Notes</span>
+        </button>
+        <button className={`ctl ${openPolls.length ? 'active' : ''}`} onClick={() => { setAskOpen(true); if (panel !== 'chat') setPanel('chat'); }}>
+          {Icon.poll}<span>Ask</span>
         </button>
         <button className="ctl" onClick={() => react('👍')}>
           <span style={{ fontSize: 18, lineHeight: '19px' }}>👍</span><span>React</span>
@@ -528,6 +680,14 @@ export default function CallScreen({ session, call, onLeave }) {
         ))}
       </div>
 
+      {askOpen && (
+        <div className="ph-scrim" onClick={() => setAskOpen(false)}>
+          <div className="ph-sheet desk" role="dialog" onClick={(e) => e.stopPropagation()}>
+            <PollComposer onAsk={ask} onCancel={() => setAskOpen(false)} />
+          </div>
+        </div>
+      )}
+      {handQueue.length > 0 && <div className="queue-chip">✋ {handQueue.map(([, p]) => p.name).join(' → ')}</div>}
       {playBlocked && (
         <button className="unblock" onClick={unblockPlayback}>
           🔊 Tap to enable incoming audio &amp; video

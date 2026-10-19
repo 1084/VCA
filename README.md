@@ -140,6 +140,17 @@ Netlify origin afterwards.
 Netlify: retired. `netlify.toml.retire` → rename to `netlify.toml` and push once Pages is live;
 the old URL then 301s to the new domain.
 
+### In the room (2026-10)
+
+Workspace (Notes / Code / Whiteboard) was replaced by three meeting tools:
+
+- **Notes** — one shared text area per room (Yjs, saved with the room code). Checklist / bullet /
+  timestamp helpers. *Share notes* sends notes + poll results as text through the share sheet;
+  *Save notes to this device* writes a `.txt`.
+- **Ask the room** — polls with 2–5 answers (Yes / No / Not sure is one tap). The server referees
+  (one vote per connection, only the asker closes); the result lands in chat and in the notes.
+- **Hand queue** — raised hands show in the order they went up.
+
 ### Layout harness (no backend)
 
 ```
