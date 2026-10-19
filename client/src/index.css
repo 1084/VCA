@@ -114,7 +114,7 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .msg .bubble{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13.5px;width:fit-content;max-width:100%;overflow-wrap:anywhere}
 .msg.me .bubble{background:var(--amber-dim);border-color:rgba(255,180,84,.25)}
 .chat-input{display:flex;gap:8px;padding:14px;border-top:1px solid var(--line)}
-.chat-input input{flex:1;padding:10px 13px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line)}
+.chat-input input{flex:1;min-width:0;padding:10px 13px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line)}
 .chat-input input:focus{border-color:var(--amber);outline:none}
 .chat-input .send{padding:10px 14px;border-radius:9px;background:var(--amber);color:#20160A;font-weight:600}
 .p-item{display:flex;align-items:center;gap:11px;font-size:13.5px}
@@ -181,103 +181,130 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .cm-scroller{font-family:var(--font-mono)!important;line-height:1.65}
 
 /* "Phone" = narrow OR short. A phone held sideways is ~850px wide but only
-   ~390px tall, which the desktop layout can't fit — it needs theater mode too. */
+   ~390px tall, which the desktop layout can't fit — it needs theater mode too.
+   Keep this query in sync with PHONE_QUERY in usePhone.js. */
 @media(max-width:760px),(max-height:500px){
   .auth-left{display:none}
 
   /* ===== PHONE "THEATER MODE" =====
-     Video owns the whole screen; everything else floats over it as
-     translucent glass. Nothing ever shrinks or covers the video with a
-     solid block — chat is a transparent lane fading into the picture,
-     controls are weightless icons. (Desktop layout is untouched.) */
-  .call{position:relative;background:#000}
-  .call-body{position:absolute;inset:0;display:block}
-  .stage{position:absolute;inset:0;display:grid;padding:0;gap:2px;
-    grid-template-columns:1fr;grid-auto-rows:1fr;
-    align-content:stretch;background:#000;overflow:hidden}
+     Video owns the whole screen. Chrome is three floating layers:
+       .call-top   room pill + timer (top)
+       .ph-rail    occasional actions, a thin column on the right
+       .ph-bottom  chat lane → message input → Mic / Camera / Workspace / Leave
+     Everything else is in the "More" sheet. Desktop layout is untouched. */
+  .call.phone{position:relative;background:#000;--glass:rgba(12,21,24,.5);--glass-line:rgba(232,239,240,.14)}
+  .call.phone .call-body{position:absolute;inset:0;display:block}
+  .call.phone .stage{position:absolute;inset:0;display:grid;padding:0;gap:2px;
+    grid-template-columns:1fr;grid-auto-rows:1fr;align-content:stretch;background:#000;overflow:hidden}
   /* 1-2 people: full-height rows. 3+: two columns so faces stay large. */
-  .stage:has(.tile:nth-child(3)){grid-template-columns:1fr 1fr}
-  @media(orientation:landscape){
-    .stage{grid-template-columns:repeat(auto-fit,minmax(45%,1fr))}
-    .stage:has(.tile:nth-child(3)){grid-template-columns:repeat(auto-fit,minmax(30%,1fr))}
-  }
-  /* keep nameplates clear of the floating controls */
-  .tile .nameplate{bottom:auto;top:calc(52px + env(safe-area-inset-top))}
-  .tile:nth-child(n+2) .nameplate{top:10px}
-  .call-body.ws .tile .nameplate{top:6px;left:6px}
-  .tile{border-radius:0;border:none;min-height:0;background:var(--ink)}
-  .tile .avatar{width:72px;height:72px;font-size:26px}
-  .tile .nameplate{font-size:11.5px}
+  .call.phone .stage:has(.tile:nth-child(3)){grid-template-columns:1fr 1fr}
+  /* 5+: keep the last row clear of the bottom stack */
+  .call.phone .stage:has(.tile:nth-child(5)){padding-bottom:calc(124px + env(safe-area-inset-bottom))}
+  .call.phone .tile{border-radius:0;border:none;min-height:0;background:var(--ink)}
+  .call.phone .tile .avatar{width:72px;height:72px;font-size:26px}
+  .call.phone .tile .nameplate{font-size:11.5px;bottom:auto;top:calc(52px + env(safe-area-inset-top))}
+  .call.phone .tile:nth-child(n+2) .nameplate{top:10px}
+  .call.phone .stage:has(.tile:nth-child(3)) .tile:nth-child(2) .nameplate{top:calc(52px + env(safe-area-inset-top))}
 
-  /* Floating top chip */
-  .call-top{position:absolute;top:0;left:0;right:0;z-index:20;border:none;
-    padding:calc(8px + env(safe-area-inset-top)) 10px 8px;
-    background:linear-gradient(rgba(0,0,0,.55),transparent)}
-  .call-top .mark{display:none}
-  .room-chip{background:rgba(12,21,24,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:12px;padding:6px 10px}
-  .call-top .timer{color:rgba(232,239,240,.85);text-shadow:0 1px 3px rgba(0,0,0,.6)}
+  /* Top pill */
+  .call.phone .call-top{position:absolute;top:0;left:0;right:0;z-index:20;border:none;
+    padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
+    background:linear-gradient(rgba(0,0,0,.55),transparent);pointer-events:none}
+  .call.phone .call-top>*{pointer-events:auto}
+  .call.phone .room-chip{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:12px;padding:6px 10px;border-color:var(--glass-line)}
+  .call.phone .call-top .timer{color:rgba(232,239,240,.85);text-shadow:0 1px 3px rgba(0,0,0,.6)}
 
-  /* Floating glass controls */
-  .controls{position:absolute;left:0;right:0;bottom:0;z-index:30;border:none;
-    flex-wrap:nowrap;justify-content:flex-start;gap:8px;overflow-x:auto;scrollbar-width:none;
-    padding:8px 10px calc(10px + env(safe-area-inset-bottom));
-    background:linear-gradient(transparent,rgba(0,0,0,.6))}
-  .controls::-webkit-scrollbar{display:none}
-  .ctl{flex-shrink:0}
-  .ctl-leave{position:sticky;right:0;margin-left:auto;box-shadow:-10px 0 14px rgba(0,0,0,.45)}
-  .ctl{min-width:44px;width:44px;height:44px;padding:0;border-radius:50%;justify-content:center;
-    background:rgba(12,21,24,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-    border:1px solid rgba(232,239,240,.14)}
-  .ctl span{display:none}
-  .ctl svg{width:19px;height:19px}
-  .ctl.off{background:rgba(255,92,92,.3);border-color:rgba(255,92,92,.5)}
-  .ctl.active{background:rgba(255,180,84,.3);border-color:rgba(255,180,84,.55)}
-  .ctl-leave{width:auto;height:44px;padding:0 16px;border-radius:22px;font-size:13px;
-    background:var(--red);border-color:var(--red)}
+  /* Glass buttons shared by rail + primary row */
+  .call.phone .ctl{min-width:44px;width:44px;height:44px;padding:0;border-radius:50%;justify-content:center;gap:0;
+    background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border:1px solid var(--glass-line);position:relative;flex-shrink:0;color:var(--text)}
+  .call.phone .ctl svg{width:20px;height:20px}
+  .call.phone .ctl span{display:none}
+  .call.phone .ctl.off{background:rgba(255,92,92,.32);border-color:rgba(255,92,92,.55)}
+  .call.phone .ctl.active{background:rgba(255,180,84,.3);border-color:rgba(255,180,84,.55)}
+  .call.phone .ctl .count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+    background:var(--amber);color:#20160A;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;font-style:normal}
 
-  /* Chat: a transparent overlay lane on the lower third. Messages scroll
-     and fade out upward into the video; the input floats above the controls. */
-  .panel{position:absolute;left:0;right:0;bottom:0;top:auto;width:auto;z-index:25;
-    height:min(55dvh,460px);background:transparent;border:none;
-    padding-bottom:calc(70px + env(safe-area-inset-bottom));pointer-events:none}
-  .panel-head{padding:0 12px 4px;border:none;pointer-events:auto;
-    background:none;justify-content:flex-end}
-  .panel-head h3{display:none}
-  .panel-head button{width:32px;height:32px;border-radius:50%;font-size:18px;color:var(--text);
-    background:rgba(12,21,24,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-    border:1px solid rgba(232,239,240,.14);display:flex;align-items:center;justify-content:center}
-  .panel-body{padding:8px 12px;gap:6px;justify-content:flex-end;pointer-events:none;
-    -webkit-mask-image:linear-gradient(transparent,#000 22%);mask-image:linear-gradient(transparent,#000 22%)}
-  .msg{max-width:78%;pointer-events:auto}
-  .msg .who{font-size:11px;margin-bottom:1px;text-shadow:0 1px 3px rgba(0,0,0,.8);color:rgba(232,239,240,.8)}
-  .msg .bubble{font-size:13px;padding:7px 11px;border-radius:12px;
-    background:rgba(12,21,24,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-    border:1px solid rgba(232,239,240,.12)}
-  .msg.me .bubble{background:rgba(255,180,84,.28);border-color:rgba(255,180,84,.35)}
-  .chat-input{padding:6px 12px 0;border:none;background:none;pointer-events:auto}
-  .chat-input input{font-size:16px;border-radius:22px;padding:11px 16px;
-    background:rgba(12,21,24,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-    border:1px solid rgba(232,239,240,.18)}
-  .chat-input .send{border-radius:22px;padding:0 16px}
-  /* People list reuses the lane with readable rows */
-  .p-item{padding:7px 11px;border-radius:12px;background:rgba(12,21,24,.55);
-    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(232,239,240,.12)}
+  /* Right rail */
+  .ph-rail{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:30;
+    display:flex;flex-direction:column;gap:14px}
+  .ph-rail .ctl{width:48px;height:48px;min-width:48px}
 
-  /* Workspace on a phone: a sheet over the lower part, with a filmstrip
-     of participants kept visible above it. */
-  .call-body.ws .stage{bottom:auto;height:24dvh;top:0;
-    grid-template-columns:repeat(3,1fr);padding-top:calc(44px + env(safe-area-inset-top))}
-  .call-body.ws .tile{aspect-ratio:auto}
-  .workspace{position:absolute;left:0;right:0;top:24dvh;bottom:0;display:flex;
+  /* Bottom stack. --kb is the keyboard height (0 when closed). */
+  .ph-bottom{position:absolute;left:0;right:0;bottom:var(--kb,0px);z-index:30;
+    padding:0 12px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(transparent,rgba(0,0,0,.65) 60%);pointer-events:none}
+  .ph-bottom>*{pointer-events:auto}
+  .ph-chat{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;max-width:78%;
+    -webkit-mask-image:linear-gradient(transparent,#000 18%);mask-image:linear-gradient(transparent,#000 18%)}
+  .ph-chat .msg{font-size:13px;line-height:1.35;padding:6px 10px;border-radius:12px;width:fit-content;max-width:100%;overflow-wrap:anywhere;
+    background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(232,239,240,.12)}
+  .ph-chat .msg .who{color:var(--cyan);font-weight:600}
+  .ph-chat .msg.me{background:rgba(255,180,84,.26);border-color:rgba(255,180,84,.35)}
+  .ph-chat .msg.me .who{color:var(--amber)}
+  .ph-input{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .ph-input input{flex:1;min-width:0;font-size:16px;border-radius:22px;padding:11px 16px;height:44px;
+    background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--glass-line)}
+  .ph-input input:focus{border-color:var(--amber);outline:none}
+  .ph-input .send{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    background:var(--amber);color:#20160A}
+  .ph-input .send svg{width:18px;height:18px;stroke:#20160A}
+  .ph-input .send:disabled{background:var(--glass);border:1px solid var(--glass-line);cursor:default}
+  .ph-input .send:disabled svg{stroke:var(--muted)}
+  .ph-primary{display:flex;align-items:center;justify-content:center;gap:14px}
+  .ph-primary .ctl{width:52px;height:52px;min-width:52px}
+  .call.phone .ph-primary .ctl-leave{width:auto;min-width:0;padding:0 20px;border-radius:26px;background:var(--red);border-color:var(--red);
+    display:flex;flex-direction:row;gap:8px;font-size:14px;font-weight:600;color:#fff;margin-left:10px}
+  .call.phone .ph-primary .ctl-leave svg{stroke:#fff}
+  .call.phone .ph-primary .ctl-leave span{display:inline}
+  .ph-bottom .react-pop{bottom:110px}
+
+  /* Sheet (People / More) */
+  .ph-scrim{position:absolute;inset:0;z-index:40;background:rgba(0,0,0,.35);display:flex;align-items:flex-end}
+  .ph-sheet{width:100%;max-height:70dvh;overflow:auto;background:var(--surface);border-radius:18px 18px 0 0;
+    padding:8px 16px calc(16px + env(safe-area-inset-bottom));animation:sheet-up .22s cubic-bezier(.2,.9,.2,1)}
+  @keyframes sheet-up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+  .ph-sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:4px auto 12px}
+  .ph-sheet h3{font-family:var(--font-display);font-weight:600;font-size:16px;margin-bottom:8px}
+  .ph-sheet .row{display:grid;grid-template-columns:24px 1fr;column-gap:14px;align-items:center;width:100%;text-align:left;
+    padding:13px 6px;border-bottom:1px solid var(--line);font-size:15px}
+  .ph-sheet .row:last-child{border-bottom:none}
+  .ph-sheet .row svg{width:22px;height:22px;stroke:var(--text);grid-row:span 2}
+  .ph-sheet .row small{grid-column:2;color:var(--muted);font-size:12px}
+  .ph-sheet .row small:empty{display:none}
+  .ph-people{display:flex;flex-direction:column;gap:10px;padding:4px 0}
+
+  /* Toast / autoplay prompt sit above the bottom stack */
+  .call.phone .toast{bottom:calc(150px + env(safe-area-inset-bottom))}
+  .call.phone .unblock{bottom:calc(160px + env(safe-area-inset-bottom));z-index:35;width:calc(100% - 24px);text-align:center}
+
+  /* Workspace on a phone: the stage becomes a filmstrip across the top and
+     the workspace fills the rest; chat lane hides, controls stay. */
+  .call.phone .call-body.ws .stage{bottom:auto;height:calc(150px + env(safe-area-inset-top));top:0;display:flex;gap:6px;
+    overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding:calc(48px + env(safe-area-inset-top)) 10px 8px}
+  .call.phone .call-body.ws .stage::-webkit-scrollbar{display:none}
+  .call.phone .call-body.ws .tile{flex:0 0 118px;aspect-ratio:auto;border-radius:10px}
+  .call.phone .call-body.ws .tile .avatar{width:40px;height:40px;font-size:15px}
+  .call.phone .call-body.ws .tile .nameplate{top:auto;bottom:6px;left:6px;font-size:10.5px;padding:3px 7px}
+  .call.phone .workspace{position:absolute;left:0;right:0;top:calc(150px + env(safe-area-inset-top));bottom:0;display:flex;
     border-left:none;border-top:1px solid var(--line);background:var(--ink);
-    padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+    padding-bottom:calc(126px + env(safe-area-inset-bottom))}
   .ftree{width:140px}
 
+  /* Landscape: rail and bottom stack hug the right, video keeps the left */
   @media(orientation:landscape){
-    .panel{left:auto;width:min(60vw,420px);height:calc(100dvh - 8px)}
-    .panel-head{padding-top:calc(8px + env(safe-area-inset-top))}
-    .call-body.ws .stage{height:100dvh;bottom:0;width:34vw;grid-template-columns:1fr;padding-top:calc(44px + env(safe-area-inset-top))}
-    .workspace{top:0;left:34vw;border-top:none;border-left:1px solid var(--line)}
+    .call.phone .stage{grid-template-columns:repeat(auto-fit,minmax(45%,1fr))}
+    .call.phone .stage:has(.tile:nth-child(3)){grid-template-columns:repeat(auto-fit,minmax(30%,1fr))}
+    .ph-rail{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));transform:none;flex-direction:row;right:12px}
+    .ph-rail .ctl{width:44px;height:44px;min-width:44px}
+    .ph-bottom{right:auto;width:min(60vw,440px);padding-left:calc(12px + env(safe-area-inset-left));background:none}
+    .ph-chat{max-width:100%}
+    .ph-primary{justify-content:flex-start;gap:10px}
+    .ph-primary .ctl{width:44px;height:44px;min-width:44px}
+    .ph-sheet{max-height:92dvh}
+    .call.phone .call-body.ws .stage{height:100dvh;bottom:0;width:150px;flex-direction:column;overflow-x:hidden;overflow-y:auto;padding-bottom:70px}
+    .call.phone .call-body.ws .tile{flex:0 0 90px}
+    .call.phone .workspace{top:0;left:150px;border-top:none;border-left:1px solid var(--line);padding-bottom:calc(60px + env(safe-area-inset-bottom))}
   }
 }
 

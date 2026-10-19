@@ -116,3 +116,34 @@ The real risks and their defenses:
 - Deleting a file clears its content and removes it from the tree, but
   Yjs retains lightweight tombstones in the doc until persistence-level
   compaction — harmless at this scale.
+
+
+## Hosting (2026-10)
+
+Front end: **Cloudflare Pages**, project `cove`, built from this repo.
+
+| Setting | Value |
+|---|---|
+| Root directory | `client` |
+| Build command | `npm run build` |
+| Build output | `dist` |
+| Environment variable | `VITE_BACKEND_URL=https://<your Render service>.onrender.com` |
+| Custom domain | `cove.johnhubert.llc` (Cloudflare adds the CNAME) |
+
+`client/public/_redirects` makes every path serve the app shell;
+`client/public/_headers` sets security headers and long caching for hashed assets.
+
+Back end: Render (unchanged). `CLIENT_ORIGIN` accepts a comma-separated list, so set it to
+`https://cove.johnhubert.llc,https://vcacoveapp.netlify.app` during the cutover and drop the
+Netlify origin afterwards.
+
+Netlify: retired. `netlify.toml.retire` → rename to `netlify.toml` and push once Pages is live;
+the old URL then 301s to the new domain.
+
+### Layout harness (no backend)
+
+```
+cd client && npm run demo     # http://localhost:5174/?n=3&video=1&cam=1
+```
+`n` = fake remote participants, `video=1` gives them moving canvas "video", `cam=1` turns your
+own camera tile on. Used to check the phone layout at iPhone sizes without a second device.

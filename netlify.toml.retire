@@ -1,0 +1,13 @@
+# Netlify retirement: once Cloudflare Pages serves cove.johnhubert.llc, this
+# file (renamed to netlify.toml) turns the old Netlify site into a redirect so
+# bookmarks and the storefront link keep working. Cloudflare ignores it.
+[build]
+  base = "client"
+  command = "true"
+  publish = "public"
+
+[[redirects]]
+  from = "/*"
+  to = "https://cove.johnhubert.llc/:splat"
+  status = 301
+  force = true

@@ -13,7 +13,9 @@ const { setupWSConnection, docs } = require('y-websocket/bin/utils');
 // ---- Configuration (from server/.env) ----
 const SECRET = process.env.JWT_SECRET;
 const MONGODB_URI = process.env.MONGODB_URI;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+// Comma-separated list so two front ends can be live during a hosting
+// cutover (e.g. the old Netlify URL and cove.johnhubert.llc). Exact match only.
+const CLIENT_ORIGIN = (process.env.CLIENT_ORIGIN || 'http://localhost:5173').split(',').map((o) => o.trim()).filter(Boolean);
 const PORT = process.env.PORT || 5000;
 
 // Fail fast on missing secrets — never fall back to a hardcoded value.
@@ -37,7 +39,7 @@ const TOKEN_TTL = process.env.TOKEN_TTL || '24h';
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: CLIENT_ORIGIN, // was '*' — lock CORS to your deployed client
+    origin: CLIENT_ORIGIN, // locked to the deployed client(s), never '*'
     methods: ['GET', 'POST']
   }
 });

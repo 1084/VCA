@@ -1,0 +1,21 @@
+// Layout harness: renders the call screen with fake peers and no backend.
+//   npm run demo   →  http://localhost:5174/?n=3&video=1&cam=1
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import '../src/index.css';
+import CallScreen from '../src/CallScreen';
+
+const q = new URLSearchParams(location.search);
+let stream = null;
+if (q.get('cam') === '1') {
+  const c = document.createElement('canvas'); c.width = 480; c.height = 640;
+  const ctx = c.getContext('2d'); let t = 0;
+  const draw = () => { t += .02; ctx.fillStyle = `hsl(${200 + Math.sin(t) * 20},40%,30%)`; ctx.fillRect(0, 0, 480, 640);
+    ctx.fillStyle = '#f3dcc4'; ctx.beginPath(); ctx.arc(240, 300 + Math.sin(t * 2) * 10, 100, 0, 7); ctx.fill(); requestAnimationFrame(draw); };
+  draw(); stream = c.captureStream(24);
+}
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <CallScreen session={{ token: 't', email: 'testuser@example.com' }}
+    call={{ roomId: 'JYP-3467', stream, micOn: true, camOn: q.get('cam') === '1' }}
+    onLeave={() => alert('left')} />
+);

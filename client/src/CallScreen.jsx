@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import usePhone, { useKeyboardInset } from './usePhone';
 import { socket, initials, gradFor, STUN_ONLY, fetchIceServers } from './lib';
 import useMesh from './useMesh';
 import Workspace from './collab/Workspace';
@@ -11,7 +12,10 @@ const Icon = {
   hand: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-3 0-5-1.5-6.5-3.8L3 14.7a2 2 0 0 1 3.4-2L8 15"/></svg>,
   chat: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
   people: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-  phone: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92V20a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3.09a2 2 0 0 1 2 1.72c.12.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 10"/></svg>
+  phone: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92V20a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3.09a2 2 0 0 1 2 1.72c.12.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 10"/></svg>,
+  more: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg>,
+  send: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>,
+  copy: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
 };
 
 function Tile({ name, stream, showVideo, micOn, hand, me, mirror, sharing, onPlayBlocked }) {
@@ -68,7 +72,10 @@ export default function CallScreen({ session, call, onLeave }) {
   const [sharing, setSharing] = useState(false);
   const [shareStream, setShareStream] = useState(null);
   const [hand, setHand] = useState(false);
-  const [panel, setPanel] = useState(null); // 'chat' | 'people' | null
+  const [panel, setPanel] = useState(null); // 'chat' | 'people' | null (desktop side panels)
+  const phone = usePhone();          // narrow or short viewport → theater layout
+  const kb = useKeyboardInset();     // on-screen keyboard height (0 on desktop)
+  const [sheet, setSheet] = useState(null); // phone: 'more' | 'people' | null
   const [wsOn, setWsOn] = useState(false);
   const [wsEverOn, setWsEverOn] = useState(false);
   const [msgs, setMsgs] = useState([]);
@@ -174,7 +181,10 @@ export default function CallScreen({ session, call, onLeave }) {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [msgs, panel]);
+  }, [msgs, panel, phone]);
+  // On a phone the chat lane sits above the keyboard; closing the sheet on
+  // every leave path keeps state tidy if the room is torn down underneath.
+  useEffect(() => { if (!phone) setSheet(null); }, [phone]);
 
   // Release every capture track we ever acquired (lobby stream, mid-call
   // camera, screen share) so the camera light goes off the moment you
@@ -229,6 +239,7 @@ export default function CallScreen({ session, call, onLeave }) {
 
   const toggleShare = async () => {
     if (sharing) return stopShare();
+    if (!navigator.mediaDevices?.getDisplayMedia) return toast('Screen sharing is not available on this device');
     try {
       const ds = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const track = ds.getVideoTracks()[0];
@@ -282,6 +293,153 @@ export default function CallScreen({ session, call, onLeave }) {
   const peerList = Object.entries(mesh.peers);
   const localTileStream = sharing ? shareStream : localStream;
 
+  const tiles = (
+    <>
+      <Tile name={me} me stream={localTileStream}
+        showVideo={!!localTileStream && (sharing || (camOn && !!localStream?.getVideoTracks().length))}
+        micOn={micOn} hand={hand} sharing={sharing} mirror={!sharing} />
+      {peerList.map(([id, p]) => (
+        <Tile key={id} name={p.name} stream={p.stream}
+          showVideo={!!p.stream && (p.camOn || p.sharing)}
+          micOn={p.micOn} hand={p.hand} sharing={p.sharing}
+          onPlayBlocked={onPlayBlocked} />
+      ))}
+    </>
+  );
+  const peopleRows = [[socket.id, { name: me, micOn, hand, meRow: true }], ...peerList].map(([id, p]) => {
+    const g = gradFor(p.name);
+    return (
+      <div key={id} className="p-item">
+        <div className="avatar" style={{ background: `linear-gradient(135deg,${g[0]},${g[1]})` }}>
+          {initials(p.name)}
+        </div>
+        <div>
+          <div>{p.name}{p.meRow ? ' (you)' : ''}{p.hand ? ' ✋' : ''}</div>
+          <div className="status">{p.micOn ? 'Mic on' : 'Muted'}</div>
+        </div>
+        {p.meRow && <span className="role">YOU</span>}
+      </div>
+    );
+  });
+  const handCount = (hand ? 1 : 0) + peerList.filter(([, p]) => p.hand).length;
+
+  /* ---------- PHONE: theater layout ----------
+     Video owns the screen. A thin rail on the right holds the occasional
+     actions, chat is a transparent lane above a persistent input, and the
+     bottom row is only Mic / Camera / Leave. Everything else lives in the
+     "More" sheet. Desktop markup below is unchanged. */
+  if (phone) {
+    const recent = msgs.slice(-3);
+    return (
+      <section className="screen call phone" style={{ '--kb': `${kb}px` }}>
+        <div className="call-top">
+          <div className="room-chip">
+            <span className="live">LIVE</span>
+            <span>{roomId}</span>
+            <button onClick={copyCode} title="Copy room code" aria-label="Copy room code" style={{ color: 'var(--muted)' }}>⧉</button>
+          </div>
+          <span className="timer">{mm}:{ss} · {peerList.length + 1}/10</span>
+        </div>
+
+        <div className={`call-body ${wsOn ? 'ws' : ''}`}>
+          <div className="stage">{tiles}</div>
+          {wsEverOn && <Workspace roomId={roomId} token={token} email={email} />}
+        </div>
+
+        <div className="ph-rail" style={{ display: wsOn ? 'none' : undefined }}>
+          <button className={`ctl ${sheet === 'people' ? 'active' : ''}`} onClick={() => setSheet(sheet === 'people' ? null : 'people')} aria-label="People">
+            {Icon.people}<b className="count">{peerList.length + 1}</b>
+          </button>
+          <button className={`ctl ${hand ? 'active' : ''}`} onClick={toggleHand} aria-pressed={hand} aria-label="Raise hand">
+            {Icon.hand}{handCount > 0 && <b className="count">{handCount}</b>}
+          </button>
+          <button className="ctl" onClick={() => react('👍')} aria-label="React">
+            <span style={{ fontSize: 18, lineHeight: 1 }}>👍</span>
+          </button>
+          <button className={`ctl ${sheet === 'more' ? 'active' : ''}`} onClick={() => setSheet(sheet === 'more' ? null : 'more')} aria-label="More">
+            {Icon.more}
+          </button>
+        </div>
+
+        <div className="ph-bottom">
+          {!wsOn && (
+            <div className="ph-chat" aria-live="polite">
+              {recent.map((m, i) => (
+                <div key={`${msgs.length}-${i}`} className={`msg ${m.id === socket.id ? 'me' : ''}`}>
+                  <span className="who">{m.id === socket.id ? 'You' : m.from}:</span> {m.text}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="ph-input">
+            <input placeholder="Message everyone…" value={draft} enterKeyHint="send"
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendMsg()} />
+            <button className="send" onClick={sendMsg} aria-label="Send" disabled={!draft.trim()}>{Icon.send}</button>
+          </div>
+          <div className="ph-primary">
+            <button className={`ctl ${micOn ? '' : 'off'}`} onClick={toggleMic} aria-pressed={micOn} aria-label="Mic">
+              {Icon.mic}<span>{micOn ? 'Mute' : 'Unmute'}</span>
+            </button>
+            <button className={`ctl ${camOn ? '' : 'off'}`} onClick={toggleCam} aria-pressed={camOn} aria-label="Camera">
+              {Icon.cam}<span>{camOn ? 'Camera' : 'Cam off'}</span>
+            </button>
+            <button className={`ctl ${wsOn ? 'active' : ''}`} onClick={openWorkspace} aria-pressed={wsOn} aria-label="Workspace">
+              {Icon.grid}<span>Workspace</span>
+            </button>
+            <button className="ctl ctl-leave" onClick={leave}>{Icon.phone}<span>Leave</span></button>
+          </div>
+          {floats.map((f) => (
+            <div key={f.id} className="react-pop" style={{ left: `${f.left}%` }}
+              onAnimationEnd={() => setFloats((prev) => prev.filter((x) => x.id !== f.id))}>
+              {f.emoji}
+            </div>
+          ))}
+        </div>
+
+        {sheet && (
+          <div className="ph-scrim" onClick={() => setSheet(null)}>
+            <div className="ph-sheet" role="dialog" onClick={(e) => e.stopPropagation()}>
+              <div className="grab" />
+              {sheet === 'people' ? (
+                <>
+                  <h3>In this room ({peerList.length + 1})</h3>
+                  <div className="ph-people">{peopleRows}</div>
+                </>
+              ) : (
+                <>
+                  <h3>More</h3>
+                  <button className="row" onClick={() => { setSheet(null); toggleShare(); }}>
+                    {Icon.share}<span>{sharing ? 'Stop sharing' : 'Share screen'}</span>
+                    <small>{navigator.mediaDevices?.getDisplayMedia ? '' : 'Not on this device'}</small>
+                  </button>
+                  <button className="row" onClick={() => { setSheet(null); openWorkspace(); }}>
+                    {Icon.grid}<span>{wsOn ? 'Hide workspace' : 'Open workspace'}</span><small>Notes · Code · Whiteboard</small>
+                  </button>
+                  <button className="row" onClick={() => { setSheet(null); copyCode(); }}>
+                    {Icon.copy}<span>Copy room code</span><small>{roomId}</small>
+                  </button>
+                  {playBlocked && (
+                    <button className="row" onClick={() => { setSheet(null); unblockPlayback(); }}>
+                      <span style={{ fontSize: 18 }}>🔊</span><span>Enable incoming audio</span>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {playBlocked && !sheet && (
+          <button className="unblock" onClick={unblockPlayback}>
+            🔊 Tap to enable incoming audio &amp; video
+          </button>
+        )}
+        <div className={`toast ${toastMsg ? 'on' : ''}`} role="status">{toastMsg}</div>
+      </section>
+    );
+  }
+
   return (
     <section className="screen call">
       <div className="call-top">
@@ -295,17 +453,7 @@ export default function CallScreen({ session, call, onLeave }) {
       </div>
 
       <div className={`call-body ${wsOn ? 'ws' : ''}`}>
-        <div className="stage">
-          <Tile name={me} me stream={localTileStream}
-            showVideo={!!localTileStream && (sharing || (camOn && !!localStream?.getVideoTracks().length))}
-            micOn={micOn} hand={hand} sharing={sharing} mirror={!sharing} />
-          {peerList.map(([id, p]) => (
-            <Tile key={id} name={p.name} stream={p.stream}
-              showVideo={!!p.stream && (p.camOn || p.sharing)}
-              micOn={p.micOn} hand={p.hand} sharing={p.sharing}
-              onPlayBlocked={onPlayBlocked} />
-          ))}
-        </div>
+        <div className="stage">{tiles}</div>
 
         {wsEverOn && <Workspace roomId={roomId} token={token} email={email} />}
 
@@ -336,23 +484,7 @@ export default function CallScreen({ session, call, onLeave }) {
               <h3>Participants ({peerList.length + 1})</h3>
               <button onClick={() => setPanel(null)} aria-label="Close participants">×</button>
             </div>
-            <div className="panel-body">
-              {[[socket.id, { name: me, micOn, hand, meRow: true }], ...peerList].map(([id, p]) => {
-                const g = gradFor(p.name);
-                return (
-                  <div key={id} className="p-item">
-                    <div className="avatar" style={{ background: `linear-gradient(135deg,${g[0]},${g[1]})` }}>
-                      {initials(p.name)}
-                    </div>
-                    <div>
-                      <div>{p.name}{p.meRow ? ' (you)' : ''}{p.hand ? ' ✋' : ''}</div>
-                      <div className="status">{p.micOn ? 'Mic on' : 'Muted'}</div>
-                    </div>
-                    {p.meRow && <span className="role">YOU</span>}
-                  </div>
-                );
-              })}
-            </div>
+            <div className="panel-body">{peopleRows}</div>
           </aside>
         )}
       </div>
