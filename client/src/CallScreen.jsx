@@ -345,6 +345,12 @@ export default function CallScreen({ session, call, onLeave }) {
           <div className="stage">{tiles}</div>
           {wsEverOn && <Workspace roomId={roomId} token={token} email={email} />}
         </div>
+        {wsOn && (
+          <div className="ph-ws-bar">
+            {Icon.grid}<b>Workspace</b><small>shared with the room</small>
+            <button onClick={() => setWsOn(false)} aria-label="Close workspace">Close</button>
+          </div>
+        )}
 
         <div className="ph-rail" style={{ display: wsOn ? 'none' : undefined }}>
           <button className={`ctl ${sheet === 'people' ? 'active' : ''}`} onClick={() => setSheet(sheet === 'people' ? null : 'people')} aria-label="People">
@@ -383,9 +389,6 @@ export default function CallScreen({ session, call, onLeave }) {
             </button>
             <button className={`ctl ${camOn ? '' : 'off'}`} onClick={toggleCam} aria-pressed={camOn} aria-label="Camera">
               {Icon.cam}<span>{camOn ? 'Camera' : 'Cam off'}</span>
-            </button>
-            <button className={`ctl ${wsOn ? 'active' : ''}`} onClick={openWorkspace} aria-pressed={wsOn} aria-label="Workspace">
-              {Icon.grid}<span>Workspace</span>
             </button>
             <button className="ctl ctl-leave" onClick={leave}>{Icon.phone}<span>Leave</span></button>
           </div>
