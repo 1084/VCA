@@ -5,6 +5,7 @@ import ReactDOM from 'react-dom/client';
 import '../src/index.css';
 import CallScreen from '../src/CallScreen';
 import RoomEntry from '../src/RoomEntry';
+import LobbyScreen from '../src/LobbyScreen';
 
 const q = new URLSearchParams(location.search);
 let stream = null;
@@ -16,7 +17,8 @@ if (q.get('cam') === '1') {
   draw(); stream = c.captureStream(24);
 }
 const root = ReactDOM.createRoot(document.getElementById('root'));
-if (q.get('door') === '1') root.render(<RoomEntry slug="ms-ortiz" session={null} onEnter={() => alert('enter')} />);
+if (q.get('lobby') === '1') root.render(<LobbyScreen session={{ token: 't', email: 'testuser@example.com' }} email="testuser@example.com" onJoin={() => alert('join')} />);
+else if (q.get('door') === '1') root.render(<RoomEntry slug="ms-ortiz" session={null} onEnter={() => alert('enter')} />);
 else root.render(
   <CallScreen session={{ token: 't', email: 'testuser@example.com' }}
     call={{ roomId: 'JYP-3467', stream, micOn: true, camOn: q.get('cam') === '1' }}

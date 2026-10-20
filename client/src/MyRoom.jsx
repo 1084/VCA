@@ -10,6 +10,7 @@ export default function MyRoom({ session, onOpen }) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState('');
+  const [agree, setAgree] = useState(false);
 
   const load = () => whoAmI(session.token).then(setMe).catch(() => setMe({ host: false, rooms: [] }));
   useEffect(() => { load(); }, [session.token]);
@@ -19,7 +20,7 @@ export default function MyRoom({ session, onOpen }) {
   const blank = { slug: '', name: '', theme: 'tutoring', locked: true, tipLink: '', payLink: '', payNote: '' };
   const save = async () => {
     setBusy(true); setErr('');
-    try { await saveRoom(session.token, edit); setEdit(null); await load(); }
+    try { await saveRoom(session.token, { ...edit, acceptTerms: agree || !!me.termsAcceptedAt }); setEdit(null); await load(); }
     catch (e) { setErr(e.message); }
     setBusy(false);
   };
@@ -34,12 +35,12 @@ export default function MyRoom({ session, onOpen }) {
     <div className="myroom">
       <div className="myroom-head">
         <h3>My rooms</h3>
-        {!edit && me.rooms.length < 3 && <button className="wb-btn on" onClick={() => setEdit(blank)}>＋ New room</button>}
+        {!edit && me.rooms.length < (me.maxRooms || 1) && <button className="wb-btn on" onClick={() => setEdit(blank)}>＋ New room</button>}
       </div>
       {me.rooms.map((r) => (
         <div key={r.slug} className="myroom-row">
           <div>
-            <b>{r.name}</b> <span className="muted">· {r.theme} · {r.locked ? 'door locked' : 'door open'}</span>
+            <b>{r.name}</b> <span className="muted">· {r.theme} · {r.locked ? 'door locked' : 'door open'}{r.expiresInDays <= 30 ? ` · unused ${r.idleDays} days — archived in ${r.expiresInDays}` : ''}</span>
             <div className="muted mono">{roomUrl(r.slug)}</div>
           </div>
           <div className="myroom-actions">
@@ -49,7 +50,7 @@ export default function MyRoom({ session, onOpen }) {
           </div>
         </div>
       ))}
-      {me.rooms.length === 0 && !edit && <p className="muted" style={{ fontSize: 13.5 }}>You're an invited host. Create a room to get a link you can give students.</p>}
+      {me.rooms.length === 0 && !edit && <p className="muted" style={{ fontSize: 13.5 }}>You're an invited host. Create your room to get a link you can give students.</p>}
       {edit && (
         <div className="myroom-form">
           <div className="field"><label>Room link</label>
@@ -64,10 +65,16 @@ export default function MyRoom({ session, onOpen }) {
           <div className="field"><label>Tip link (optional) — your own PayPal.me, Venmo, Ko-fi, Stripe link…</label><input value={edit.tipLink} placeholder="https://paypal.me/yourname" onChange={(e) => set('tipLink', e.target.value)} /></div>
           <div className="field"><label>Paid door (optional) — your own payment link; guests pay there before you let them in</label><input value={edit.payLink} placeholder="https://…" onChange={(e) => set('payLink', e.target.value)} /></div>
           {edit.payLink && <div className="field"><label>What it costs, in your words</label><input value={edit.payNote} maxLength={80} placeholder="$15 per session, or $50 for four" onChange={(e) => set('payNote', e.target.value)} /></div>}
+          {!me.termsAcceptedAt && (
+            <label className="agree">
+              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+              <span>I'm an adult, I'm responsible for who I let into my room, and I agree to the <a href="/rooms/#trust" target="_blank" rel="noopener">conduct rule</a> and the <a href="https://johnhubert.llc/privacy.html" target="_blank" rel="noopener">privacy policy</a>. Rooms unused for 90 days are archived.</span>
+            </label>
+          )}
           <p className="form-err">{err}</p>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-ghost" onClick={() => { setEdit(null); setErr(''); }}>Cancel</button>
-            <button className="btn btn-primary" style={{ width: 'auto', flex: 1 }} disabled={busy || !edit.slug} onClick={save}>{busy ? '…' : 'Save room'}</button>
+            <button className="btn btn-primary" style={{ width: 'auto', flex: 1 }} disabled={busy || !edit.slug || (!me.termsAcceptedAt && !agree)} onClick={save}>{busy ? '…' : 'Save room'}</button>
             {me.rooms.some((r) => r.slug === edit.slug) && <button className="wb-btn wb-clear" onClick={() => remove(edit.slug)}>Close room</button>}
           </div>
         </div>

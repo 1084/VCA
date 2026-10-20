@@ -45,6 +45,7 @@ function attachSignaling(io, { maxRoomSize = 10 } = {}) {
       }
       if (!roomIsOpen(named)) return socket.emit('denied', { reason: 'closed' });
       const isOwner = socket.user?.email === named.ownerEmail;
+      if (isOwner) Room.updateOne({ slug: roomId }, { lastSessionAt: new Date() }).catch(() => {});
       if (isOwner || !named.locked) return enter(roomId, named);
 
       // Locked: knock. The host sees the knock; the guest waits outside.

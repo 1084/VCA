@@ -155,7 +155,13 @@ Workspace (Notes / Code / Whiteboard) was replaced by three meeting tools:
 
 Named rooms for invited hosts, guests without accounts, a lockable door, and a report path.
 
-- `HOST_EMAILS` (server env): who may create rooms. Hosts see **My rooms** in the lobby:
+- Hosts: `user.host` set with `POST /api/admin/hosts {email, host, maxRooms}` (Bearer `ADMIN_KEY`);
+  `HOST_EMAILS` still works as a bootstrap. One room per host by default (`maxRooms`). The first
+  room records `termsAcceptedAt` + `termsVersion` (conduct rule + terms checkbox).
+- Expiry sweep every 6 h: a named room with no host session for 90 days is archived (room +
+  notes deleted; the lobby warns from 30 days out); notes of plain code rooms idle 30 days are
+  deleted. Guest-key requests share the sign-in rate limit.
+- Hosts see **My rooms** in the lobby:
   link (`/r/<slug>`), name, theme, door locked/open, their own tip link and paid-door link.
 - Guests open `/r/<slug>`: the door shows whether the host is in and how many are inside; a
   name is enough to get a 12-hour key scoped to that one room (socket + notes). Nothing is

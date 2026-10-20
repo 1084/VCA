@@ -14,7 +14,8 @@ const chain = (v) => ({ lean: () => ({ catch: () => Promise.resolve(v) }), catch
 const mockRooms = {
   Room: {
     findOne: (f) => chain(q(f)),
-    findOneAndUpdate: (f, upd) => { const r = q(f); if (r) Object.assign(r, upd); return chain(r); }
+    findOneAndUpdate: (f, upd) => { const r = q(f); if (r) Object.assign(r, upd); return chain(r); },
+    updateOne: (f, upd) => { const r = q(f); if (r) Object.assign(r, upd); return chain({ ok: 1 }); }
   },
   Report: { create: async (d) => { reports.push(d); } },
   roomIsOpen: (r) => !r.paidThrough || r.paidThrough > Date.now()
@@ -43,8 +44,9 @@ rooms.set('ms-ortiz', { slug: 'ms-ortiz', name: 'Spanish with Ms. Ortiz', ownerE
 
   // 2. host enters a locked room
   const host = await connect({ email: 'ortiz@example.com' });
+  const hp = once(host, 'peers'), hs = once(host, 'room-state');
   host.emit('join', 'ms-ortiz');
-  await once(host, 'peers'); const st = await once(host, 'room-state');
+  await hp; const st = await hs;
   assert.strictEqual(st.hostPresent, true); assert.strictEqual(st.locked, true); console.log('✓ host in, door locked');
 
   // 3. guest knocks, host sees knock, admits → guest gets peers

@@ -54,7 +54,15 @@ mongoose.connect(MONGODB_URI).catch((err) => {
 
 const userSchema = new mongoose.Schema({
   email: { type: String, unique: true },
-  password: String
+  password: String,
+  // Cove Rooms: invited hosts. Set with the admin action (or bootstrapped
+  // from HOST_EMAILS). termsAcceptedAt is recorded when the host creates
+  // their first room after ticking the conduct rule + terms.
+  host: { type: Boolean, default: false },
+  hostSince: Date,
+  maxRooms: { type: Number, default: 1 },
+  termsAcceptedAt: Date,
+  termsVersion: String
 });
 const User = mongoose.model('User', userSchema);
 
@@ -131,7 +139,7 @@ const requireAuth = (req, res, next) => {
   } catch { res.status(401).json({ error: 'Unauthorized' }); }
 };
 const { attachRooms } = require('./rooms');
-attachRooms(app, io, { secret: SECRET, adminKey: process.env.ADMIN_KEY || '', requireAuth });
+attachRooms(app, io, { secret: SECRET, adminKey: process.env.ADMIN_KEY || '', requireAuth, User, WorkspaceDoc, authLimiter });
 
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
