@@ -121,6 +121,18 @@ app.post('/api/login', authLimiter, async (req, res) => {
 const { attachTurn } = require('./turn');
 attachTurn(app, { verifyToken: (t) => jwt.verify(t, SECRET) });
 
+// ---- Cove Rooms (named rooms, guests, door, reports) ----
+const requireAuth = (req, res, next) => {
+  try {
+    const t = (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    req.user = jwt.verify(t, SECRET);
+    if (req.user.guest) return res.status(403).json({ error: 'Guests cannot do that.' });
+    next();
+  } catch { res.status(401).json({ error: 'Unauthorized' }); }
+};
+const { attachRooms } = require('./rooms');
+attachRooms(app, io, { secret: SECRET, adminKey: process.env.ADMIN_KEY || '', requireAuth });
+
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error('Unauthorized'));
@@ -193,6 +205,11 @@ server.on('upgrade', (req, socket, head) => {
   }
 
   const docName = url.pathname.slice('/collab/'.length) || 'default';
+  // a guest key opens only its own room's notes
+  try {
+    const u = jwt.verify(url.searchParams.get('token'), SECRET);
+    if (u.guest && docName !== `room-${u.room}`) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return; }
+  } catch { /* already verified above */ }
   wss.handleUpgrade(req, socket, head, (ws) => {
     setupWSConnection(ws, req, { docName });
     const doc = docs.get(docName);

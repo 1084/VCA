@@ -43,3 +43,22 @@ export const newRoomCode = () => {
 };
 
 export const ROOM_CODE_PATTERN = /^[A-Za-z0-9_-]{3,32}$/;
+
+// ---- Cove Rooms API (named rooms, guest keys) ----
+async function api(path, { method = 'GET', token, body } = {}) {
+  const res = await fetch(`${BACKEND_URL}/api/${path}`, {
+    method,
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || `Request failed (${res.status})`);
+  return j;
+}
+export const roomInfo = (slug) => api(`r/${encodeURIComponent(slug)}`);
+export const guestKey = (slug, name) => api(`r/${encodeURIComponent(slug)}/guest`, { method: 'POST', body: { name } });
+export const whoAmI = (token) => api('me', { token });
+export const saveRoom = (token, room) => api('rooms', { method: 'POST', token, body: room });
+export const deleteRoom = (token, slug) => api(`rooms/${encodeURIComponent(slug)}`, { method: 'DELETE', token });
+export const roomSlugFromPath = () => { const m = location.pathname.match(/^\/r\/([a-z0-9-]{3,32})\/?$/i); return m ? m[1].toLowerCase() : null; };
+export const roomUrl = (slug) => `${location.origin}/r/${slug}`;

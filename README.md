@@ -151,6 +151,25 @@ Workspace (Notes / Code / Whiteboard) was replaced by three meeting tools:
   (one vote per connection, only the asker closes); the result lands in chat and in the notes.
 - **Hand queue** — raised hands show in the order they went up.
 
+### Cove Rooms (2026-10-20)
+
+Named rooms for invited hosts, guests without accounts, a lockable door, and a report path.
+
+- `HOST_EMAILS` (server env): who may create rooms. Hosts see **My rooms** in the lobby:
+  link (`/r/<slug>`), name, theme, door locked/open, their own tip link and paid-door link.
+- Guests open `/r/<slug>`: the door shows whether the host is in and how many are inside; a
+  name is enough to get a 12-hour key scoped to that one room (socket + notes). Nothing is
+  stored about guests.
+- Locked door: the guest knocks, the host sees a banner and lets them in or not. Knocking
+  only works while the host is in the room, so a paid guest can never enter an empty room.
+- Money never passes through Cove: tip and paid-door links open the host's own PayPal /
+  Wise / Stripe link. The host admits a paying guest on seeing their payment arrive.
+- Report (everyone, even while knocking): room, name, words, time → `Report` collection;
+  read with `GET /api/admin/reports` (Bearer `ADMIN_KEY`). Hosts can remove people and
+  lock/unlock from the call.
+- Tests: `cd server && npm test` runs the door flow against the real signaling module with
+  an in-memory stand-in for Mongo.
+
 ### Layout harness (no backend)
 
 ```

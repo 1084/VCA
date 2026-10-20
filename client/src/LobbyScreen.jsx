@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { initials, gradFor, newRoomCode, ROOM_CODE_PATTERN } from './lib';
+import MyRoom from './MyRoom';
 
-export default function LobbyScreen({ email, onJoin }) {
+export default function LobbyScreen({ session, email, onJoin }) {
   const name = email.split('@')[0];
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(false);
@@ -65,8 +66,10 @@ export default function LobbyScreen({ email, onJoin }) {
   useEffect(() => () => previewStream.current?.getTracks().forEach((t) => t.stop()), []);
 
   const join = async (roomId) => {
-    const id = (roomId || code).trim().toUpperCase();
-    if (!ROOM_CODE_PATTERN.test(id)) return setErr('Room codes look like KJH-4821.');
+    const raw = (roomId || code).trim();
+    // KJH-4821 style codes are upper-case; named rooms (ms-ortiz) are lower-case slugs
+    const id = /^[a-z]{3}-\d{4}$/i.test(raw) ? raw.toUpperCase() : raw.toLowerCase();
+    if (!ROOM_CODE_PATTERN.test(id)) return setErr('Room codes look like KJH-4821, or a room link name.');
     setErr('');
     setJoining(true);
     previewStream.current?.getTracks().forEach((t) => t.stop());
@@ -177,6 +180,7 @@ export default function LobbyScreen({ email, onJoin }) {
             onClick={() => join(newRoomCode())}>
             ＋ Start a new room
           </button>
+          {session && <MyRoom session={session} onOpen={(slug) => join(slug)} />}
         </div>
       </div>
     </section>

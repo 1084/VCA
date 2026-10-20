@@ -4,6 +4,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '../src/index.css';
 import CallScreen from '../src/CallScreen';
+import RoomEntry from '../src/RoomEntry';
 
 const q = new URLSearchParams(location.search);
 let stream = null;
@@ -14,7 +15,9 @@ if (q.get('cam') === '1') {
     ctx.fillStyle = '#f3dcc4'; ctx.beginPath(); ctx.arc(240, 300 + Math.sin(t * 2) * 10, 100, 0, 7); ctx.fill(); requestAnimationFrame(draw); };
   draw(); stream = c.captureStream(24);
 }
-ReactDOM.createRoot(document.getElementById('root')).render(
+const root = ReactDOM.createRoot(document.getElementById('root'));
+if (q.get('door') === '1') root.render(<RoomEntry slug="ms-ortiz" session={null} onEnter={() => alert('enter')} />);
+else root.render(
   <CallScreen session={{ token: 't', email: 'testuser@example.com' }}
     call={{ roomId: 'JYP-3467', stream, micOn: true, camOn: q.get('cam') === '1' }}
     onLeave={() => alert('left')} />

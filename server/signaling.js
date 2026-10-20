@@ -12,33 +12,102 @@
 
 const REACTIONS = ['👍', '🎉', '❤️', '😂', '👏', '😮', '🔥'];
 const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{3,32}$/;
+const { Room, Report, roomIsOpen } = require('./rooms');
+
+const nameOf = (user) => (user?.name || (user?.email || 'guest').split('@')[0]).slice(0, 32);
 
 function attachSignaling(io, { maxRoomSize = 10 } = {}) {
   io.on('connection', (socket) => {
-    const displayName = () =>
-      (socket.user?.email || 'guest').split('@')[0].slice(0, 32);
+    const displayName = () => nameOf(socket.user);
+    const isGuest = () => !!socket.user?.guest;
 
-    socket.on('join', (roomId) => {
+    // Actually put a socket in a room and introduce everyone.
+    const enter = (roomId, named) => enterAs(socket, roomId, named);
+    const roomState = (named, roomId) => {
+      const set = io.sockets.adapter.rooms.get(roomId);
+      let hostPresent = false;
+      for (const id of set || []) if (io.sockets.sockets.get(id)?.user?.email === named.ownerEmail) hostPresent = true;
+      return { slug: named.slug, name: named.name, theme: named.theme, locked: !!named.locked, tipLink: named.tipLink || '',
+        payLink: named.payLink || '', payNote: named.payNote || '', hostName: (named.ownerEmail || '').split('@')[0], hostPresent };
+    };
+    const hostSockets = (named) => [...io.sockets.sockets.values()].filter((s) => s.user?.email === named.ownerEmail && s.data.roomId === named.slug);
+
+    socket.on('join', async (roomId) => {
       if (typeof roomId !== 'string' || !ROOM_ID_PATTERN.test(roomId)) return;
-      if (socket.data.roomId) return; // one room per connection
+      if (socket.data.roomId || socket.data.knocking) return; // one room per connection
+      // a guest key opens exactly one room
+      if (isGuest() && socket.user.room !== roomId) return socket.emit('denied', { reason: 'wrong-room' });
 
-      const room = io.sockets.adapter.rooms.get(roomId);
-      if ((room?.size || 0) >= maxRoomSize) {
-        socket.emit('room-full', { max: maxRoomSize });
-        return;
+      const named = await Room.findOne({ slug: roomId }).lean().catch(() => null);
+      if (!named) {
+        if (isGuest()) return socket.emit('denied', { reason: 'no-room' });
+        return enter(roomId); // plain code room, as before
       }
+      if (!roomIsOpen(named)) return socket.emit('denied', { reason: 'closed' });
+      const isOwner = socket.user?.email === named.ownerEmail;
+      if (isOwner || !named.locked) return enter(roomId, named);
 
-      const existing = [...(room || [])].map((id) => ({
-        id,
-        name: (io.sockets.sockets.get(id)?.user?.email || 'guest')
-          .split('@')[0]
-          .slice(0, 32)
-      }));
+      // Locked: knock. The host sees the knock; the guest waits outside.
+      const hosts = hostSockets(named);
+      if (!hosts.length) return socket.emit('denied', { reason: 'host-away', room: roomState(named, roomId) });
+      socket.data.knocking = roomId;
+      socket.emit('knocking', { room: roomState(named, roomId) });
+      hosts.forEach((h) => h.emit('knock', { id: socket.id, name: displayName() }));
+    });
 
-      socket.join(roomId);
-      socket.data.roomId = roomId;
-      socket.emit('peers', existing);
-      socket.to(roomId).emit('peer-joined', { id: socket.id, name: displayName() });
+    // Host answers a knock.
+    const answer = async (id, admit) => {
+      const roomId = socket.data.roomId;
+      const guest = io.sockets.sockets.get(id);
+      if (!roomId || !guest || guest.data.knocking !== roomId) return;
+      const named = await Room.findOne({ slug: roomId }).lean().catch(() => null);
+      if (!named || named.ownerEmail !== socket.user?.email) return;
+      guest.data.knocking = null;
+      if (admit) { guest.emit('admitted'); enterAs(guest, roomId, named); } else guest.emit('denied', { reason: 'host-declined' });
+    };
+    const enterAs = (g, roomId, named) => {
+      const room = io.sockets.adapter.rooms.get(roomId);
+      if ((room?.size || 0) >= maxRoomSize) { g.emit('room-full', { max: maxRoomSize }); return false; }
+      const existing = [...(room || [])].map((pid) => ({ id: pid, name: nameOf(io.sockets.sockets.get(pid)?.user) }));
+      g.join(roomId); g.data.roomId = roomId;
+      const set = io.sockets.adapter.rooms.get(roomId);
+      if (set && !set.__startedAt) set.__startedAt = Date.now();
+      g.emit('peers', existing);
+      g.to(roomId).emit('peer-joined', { id: g.id, name: nameOf(g.user), guest: !!g.user?.guest });
+      if (named) io.in(roomId).emit('room-state', roomState(named, roomId));
+      return true;
+    };
+    socket.on('admit', ({ id } = {}) => answer(id, true));
+    socket.on('deny', ({ id } = {}) => answer(id, false));
+
+    // Host locks or unlocks the door.
+    socket.on('lock', async ({ locked } = {}) => {
+      const roomId = socket.data.roomId;
+      if (!roomId) return;
+      const named = await Room.findOneAndUpdate({ slug: roomId, ownerEmail: socket.user?.email }, { locked: !!locked }, { new: true }).lean().catch(() => null);
+      if (!named) return;
+      io.in(roomId).emit('room-state', roomState(named, roomId));
+    });
+
+    // Anyone in a room can report it. Words only, never media.
+    socket.on('report', async ({ text } = {}) => {
+      const roomId = socket.data.roomId || socket.data.knocking;
+      if (!roomId || typeof text !== 'string' || !text.trim()) return;
+      await Report.create({ room: roomId, from: displayName(), text: text.trim().slice(0, 1000) }).catch(() => {});
+      socket.emit('reported');
+    });
+
+    // Host removes someone from the room.
+    socket.on('remove', async ({ id } = {}) => {
+      const roomId = socket.data.roomId;
+      const target = io.sockets.sockets.get(id);
+      if (!roomId || !target || target.data.roomId !== roomId) return;
+      const named = await Room.findOne({ slug: roomId }).lean().catch(() => null);
+      if (!named || named.ownerEmail !== socket.user?.email) return;
+      target.emit('denied', { reason: 'removed' });
+      target.leave(roomId); target.data.roomId = null;
+      socket.to(roomId).emit('peer-left', { id: target.id });
+      target.disconnect(true);
     });
 
     // Relay a payload to one specific peer, only within the sender's room.
@@ -131,9 +200,18 @@ function attachSignaling(io, { maxRoomSize = 10 } = {}) {
       io.in(roomId).emit('poll', tally(poll));
     });
 
-    socket.on('disconnecting', () => {
+    socket.on('disconnecting', async () => {
       const roomId = socket.data.roomId;
       if (roomId) socket.to(roomId).emit('peer-left', { id: socket.id });
+      // if the host leaves a named room, tell the room (the door is effectively closed)
+      if (roomId && !isGuest()) {
+        const named = await Room.findOne({ slug: roomId, ownerEmail: socket.user?.email }).lean().catch(() => null);
+        if (named) setImmediate(() => io.in(roomId).emit('room-state', roomState(named, roomId)));
+      }
+      if (socket.data.knocking) {
+        const named = await Room.findOne({ slug: socket.data.knocking }).lean().catch(() => null);
+        if (named) hostSockets(named).forEach((h) => h.emit('knock-gone', { id: socket.id }));
+      }
       const store = io.sockets.adapter.rooms.get(roomId)?.__polls;
       if (store) for (const poll of store.values()) {
         if (poll.open && poll.votes.delete(socket.id)) socket.to(roomId).emit('poll', tally(poll));

@@ -3,7 +3,8 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "NODE_PATH=../client/node_modules node test/door.test.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

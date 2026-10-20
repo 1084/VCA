@@ -135,6 +135,14 @@ export default function CallScreen({ session, call, onLeave }) {
   const [myVotes, setMyVotes] = useState({}); // pollId -> option index
   const handSince = useRef({});               // peer id -> when the hand went up (for the queue)
   const notes = useNotesDoc(roomId, token, email);
+  // Named-room door state (null for plain code rooms)
+  const [room, setRoom] = useState(null);          // room-state from the server: name, locked, hostPresent, links…
+  const [door, setDoor] = useState('in');          // 'in' | 'knocking' | 'denied'
+  const [deniedWhy, setDeniedWhy] = useState('');
+  const [knocks, setKnocks] = useState([]);        // host: [{id,name}]
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportText, setReportText] = useState('');
+  const isHost = !!room && room.hostName === me && !session.guest;
   const notesRef = useRef(null); notesRef.current = notes.doc;
   const [wsOn, setWsOn] = useState(false);
   const [wsEverOn, setWsEverOn] = useState(false);
@@ -222,6 +230,20 @@ export default function CallScreen({ session, call, onLeave }) {
     socket.on('peer-left', onLeft);
     socket.on('peer-state', onState);
     socket.on('chat', onChat);
+    const onRoomState = (r) => setRoom(r);
+    const onKnocking = ({ room: r }) => { setRoom(r); setDoor('knocking'); };
+    const onAdmitted = () => { setDoor('in'); toast('You\'re in'); };
+    const onDenied = ({ reason, room: r } = {}) => { if (r) setRoom(r); setDeniedWhy(reason || ''); setDoor('denied'); };
+    const onKnock = ({ id, name }) => setKnocks((k) => (k.some((x) => x.id === id) ? k : [...k, { id, name }]));
+    const onKnockGone = ({ id }) => setKnocks((k) => k.filter((x) => x.id !== id));
+    const onReported = () => { setReportOpen(false); setReportText(''); toast('Report sent. A person will read it.'); };
+    socket.on('room-state', onRoomState);
+    socket.on('knocking', onKnocking);
+    socket.on('admitted', onAdmitted);
+    socket.on('denied', onDenied);
+    socket.on('knock', onKnock);
+    socket.on('knock-gone', onKnockGone);
+    socket.on('reported', onReported);
     socket.on('reaction', onReaction);
     socket.on('poll', onPoll);
     socket.on('room-full', onFull);
@@ -243,6 +265,13 @@ export default function CallScreen({ session, call, onLeave }) {
       socket.off('peer-left', onLeft);
       socket.off('peer-state', onState);
       socket.off('chat', onChat);
+      socket.off('room-state', onRoomState);
+      socket.off('knocking', onKnocking);
+      socket.off('admitted', onAdmitted);
+      socket.off('denied', onDenied);
+      socket.off('knock', onKnock);
+      socket.off('knock-gone', onKnockGone);
+      socket.off('reported', onReported);
       socket.off('reaction', onReaction);
       socket.off('poll', onPoll);
       socket.off('room-full', onFull);
@@ -355,7 +384,8 @@ export default function CallScreen({ session, call, onLeave }) {
     setDraft('');
   };
   const copyCode = () => {
-    navigator.clipboard?.writeText(roomId).then(() => toast('Room code copied'));
+    const v = room ? `${location.origin}/r/${roomId}` : roomId;
+    navigator.clipboard?.writeText(v).then(() => toast(room ? 'Room link copied' : 'Room code copied'));
   };
   const openWorkspace = () => {
     const v = !wsOn;
@@ -395,6 +425,14 @@ export default function CallScreen({ session, call, onLeave }) {
   const handQueue = [[socket.id, { name: me, hand }], ...peerList].filter(([, p]) => p.hand)
     .sort((a, b) => (handSince.current[a[0]] || 0) - (handSince.current[b[0]] || 0));
 
+  const admit = (id) => { socket.emit('admit', { id }); setKnocks((k) => k.filter((x) => x.id !== id)); };
+  const deny = (id) => { socket.emit('deny', { id }); setKnocks((k) => k.filter((x) => x.id !== id)); };
+  const setLock = (locked) => socket.emit('lock', { locked });
+  const removePeer = (id) => { if (window.confirm('Remove this person from the room?')) socket.emit('remove', { id }); };
+  const sendReport = () => { if (reportText.trim()) socket.emit('report', { text: reportText.trim() }); };
+  const tipLink = room?.tipLink || '';
+  const roomTitle = room?.name || roomId;
+
   const mm = String((seconds / 60) | 0).padStart(2, '0');
   const ss = String(seconds % 60).padStart(2, '0');
   const localTileStream = sharing ? shareStream : localStream;
@@ -424,9 +462,60 @@ export default function CallScreen({ session, call, onLeave }) {
           <div className="status">{p.micOn ? 'Mic on' : 'Muted'}</div>
         </div>
         {p.meRow && <span className="role">YOU</span>}
+        {!p.meRow && isHost && <button className="role" style={{ color: '#FFA3A3' }} onClick={() => removePeer(id)}>Remove</button>}
       </div>
     );
   });
+
+  /* Door UI shared by both layouts */
+  const doorOverlay = door !== 'in' && (
+    <div className="ph-scrim" style={{ zIndex: 70 }}>
+      <div className="ph-sheet desk door-wait" role="dialog">
+        <div className="grab" />
+        {door === 'knocking' ? (
+          <>
+            <h3>Knocking…</h3>
+            <p>{room?.hostName || 'The host'} can see you're at the door. Hang on a moment.</p>
+            <div className="knock-dots"><i /><i /><i /></div>
+          </>
+        ) : (
+          <>
+            <h3>{deniedWhy === 'host-away' ? `${room?.hostName || 'The host'} isn't in yet` : deniedWhy === 'host-declined' ? 'Not this time' : deniedWhy === 'removed' ? 'You were removed from the room' : deniedWhy === 'closed' ? 'This room is closed' : 'No way in'}</h3>
+            <p>{deniedWhy === 'host-away' ? 'The door only opens while the host is in the room. Go back to the door and try again in a bit.' : deniedWhy === 'host-declined' ? 'The host didn\'t let you in. If you were expected, check the link with them.' : ''}</p>
+          </>
+        )}
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={leave}>Back to the door</button>
+          {door === 'knocking' && <button className="btn btn-ghost" onClick={() => setReportOpen(true)}>Report</button>}
+        </div>
+      </div>
+    </div>
+  );
+  const knockBanner = isHost && knocks.length > 0 && (
+    <div className="knocks">
+      {knocks.map((k) => (
+        <div key={k.id} className="knock">
+          <span>✋ <b>{k.name}</b> is at the door</span>
+          <button className="btn btn-primary" style={{ padding: '7px 14px', width: 'auto', fontSize: 13 }} onClick={() => admit(k.id)}>Let in</button>
+          <button className="btn btn-ghost" style={{ padding: '7px 12px', fontSize: 13 }} onClick={() => deny(k.id)}>Not now</button>
+        </div>
+      ))}
+    </div>
+  );
+  const reportDialog = reportOpen && (
+    <div className="ph-scrim" style={{ zIndex: 75 }} onClick={() => setReportOpen(false)}>
+      <div className="ph-sheet desk" role="dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="grab" />
+        <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Report this room</h3>
+        <p style={{ color: 'var(--muted)', fontSize: 13.5, marginBottom: 10 }}>Tell us what happened. We receive the room, the time and your words — never any video. A person reads every report.</p>
+        <textarea className="report-ta" value={reportText} maxLength={1000} placeholder="What happened?" onChange={(e) => setReportText(e.target.value)} />
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setReportOpen(false)}>Cancel</button>
+          <button className="btn btn-primary" style={{ flex: 2 }} disabled={!reportText.trim()} onClick={sendReport}>Send report</button>
+        </div>
+      </div>
+    </div>
+  );
   const handCount = (hand ? 1 : 0) + peerList.filter(([, p]) => p.hand).length;
 
   /* ---------- PHONE: theater layout ----------
@@ -441,11 +530,13 @@ export default function CallScreen({ session, call, onLeave }) {
         <div className="call-top">
           <div className="room-chip">
             <span className="live">LIVE</span>
-            <span>{roomId}</span>
-            <button onClick={copyCode} title="Copy room code" aria-label="Copy room code" style={{ color: 'var(--muted)' }}>⧉</button>
+            <span>{roomTitle}</span>
+            {room?.locked && <span title="Door locked">🔒</span>}
+            <button onClick={copyCode} title="Copy room link" aria-label="Copy room link" style={{ color: 'var(--muted)' }}>⧉</button>
           </div>
           <span className="timer">{mm}:{ss} · {peerList.length + 1}/10</span>
         </div>
+        {knockBanner}
 
         <div className={`call-body ${wsOn ? 'ws' : ''}`}>
           <div className="stage">{tiles}</div>
@@ -548,13 +639,26 @@ export default function CallScreen({ session, call, onLeave }) {
                   <button className="row" onClick={() => { setSheet(null); downloadNotes(); }}>
                     {Icon.save}<span>Save notes to this device</span><small>.txt file</small>
                   </button>
+                  {tipLink && !isHost && (
+                    <a className="row" href={tipLink} target="_blank" rel="noopener noreferrer" onClick={() => setSheet(null)}>
+                      <span style={{ fontSize: 18 }}>💛</span><span>Tip {room.hostName}</span><small>Opens their own link; they keep all of it</small>
+                    </a>
+                  )}
+                  {isHost && (
+                    <button className="row" onClick={() => { setSheet(null); setLock(!room.locked); }}>
+                      <span style={{ fontSize: 18 }}>{room.locked ? '🔓' : '🔒'}</span><span>{room.locked ? 'Unlock the door' : 'Lock the door'}</span><small>{room.locked ? 'Anyone with the link walks in' : 'Guests knock; you let them in'}</small>
+                    </button>
+                  )}
+                  <button className="row" onClick={() => { setSheet(null); setReportOpen(true); }}>
+                    <span style={{ fontSize: 18 }}>🚩</span><span>Report this room</span><small>Words only, read by a person</small>
+                  </button>
                   <div className="row-emoji">{REACTIONS.map((e) => <button key={e} onClick={() => { setSheet(null); react(e); }}>{e}</button>)}</div>
                   <button className="row" onClick={() => { setSheet(null); toggleShare(); }}>
                     {Icon.share}<span>{sharing ? 'Stop sharing' : 'Share screen'}</span>
                     <small>{navigator.mediaDevices?.getDisplayMedia ? '' : 'Not on this device'}</small>
                   </button>
                   <button className="row" onClick={() => { setSheet(null); copyCode(); }}>
-                    {Icon.copy}<span>Copy room code</span><small>{roomId}</small>
+                    {Icon.copy}<span>{room ? 'Copy room link' : 'Copy room code'}</span><small>{room ? `${location.host}/r/${roomId}` : roomId}</small>
                   </button>
                   {playBlocked && (
                     <button className="row" onClick={() => { setSheet(null); unblockPlayback(); }}>
@@ -572,6 +676,7 @@ export default function CallScreen({ session, call, onLeave }) {
             🔊 Tap to enable incoming audio &amp; video
           </button>
         )}
+        {doorOverlay}{reportDialog}
         <div className={`toast ${toastMsg ? 'on' : ''}`} role="status">{toastMsg}</div>
       </section>
     );
@@ -582,8 +687,9 @@ export default function CallScreen({ session, call, onLeave }) {
       <div className="call-top">
         <div className="room-chip">
           <span className="live">LIVE</span>
-          <span>{roomId}</span>
-          <button onClick={copyCode} title="Copy room code" style={{ color: 'var(--muted)' }}>⧉</button>
+          <span>{roomTitle}</span>
+          {room?.locked && <span title="Door locked">🔒</span>}
+          <button onClick={copyCode} title="Copy room link" style={{ color: 'var(--muted)' }}>⧉</button>
         </div>
         <div className="mark" style={{ fontSize: 16 }}><span className="dot" />Cove</div>
         <span className="timer">{mm}:{ss} · {peerList.length + 1}/10</span>
@@ -671,6 +777,19 @@ export default function CallScreen({ session, call, onLeave }) {
           onClick={() => setPanel(panel === 'people' ? null : 'people')}>
           {Icon.people}<span>People</span>
         </button>
+        {isHost && (
+          <button className={`ctl ${room.locked ? 'active' : ''}`} onClick={() => setLock(!room.locked)} title={room.locked ? 'Door locked: guests knock' : 'Door open'}>
+            <span style={{ fontSize: 18, lineHeight: '19px' }}>{room.locked ? '🔒' : '🔓'}</span><span>Door</span>
+          </button>
+        )}
+        {tipLink && !isHost && (
+          <a className="ctl" href={tipLink} target="_blank" rel="noopener noreferrer" title={`Tip ${room.hostName} through their own link`}>
+            <span style={{ fontSize: 18, lineHeight: '19px' }}>💛</span><span>Tip</span>
+          </a>
+        )}
+        <button className="ctl" onClick={() => setReportOpen(true)} title="Report this room">
+          <span style={{ fontSize: 18, lineHeight: '19px' }}>🚩</span><span>Report</span>
+        </button>
         <button className="ctl ctl-leave" onClick={leave}>{Icon.phone}Leave</button>
         {floats.map((f) => (
           <div key={f.id} className="react-pop" style={{ left: `${f.left}%` }}
@@ -688,6 +807,7 @@ export default function CallScreen({ session, call, onLeave }) {
         </div>
       )}
       {handQueue.length > 0 && <div className="queue-chip">✋ {handQueue.map(([, p]) => p.name).join(' → ')}</div>}
+      {knockBanner}{doorOverlay}{reportDialog}
       {playBlocked && (
         <button className="unblock" onClick={unblockPlayback}>
           🔊 Tap to enable incoming audio &amp; video

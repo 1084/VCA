@@ -45,12 +45,12 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}
 .field input{width:100%;padding:12px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--line);transition:border-color .15s}
 .field input:focus{border-color:var(--amber);outline:none}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 18px;border-radius:10px;font-weight:600;transition:transform .1s,background .15s}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 18px;border-radius:10px;font-weight:600;transition:transform .1s,background .15s;text-decoration:none}
 .btn:active{transform:scale(.98)}
 .btn:disabled{opacity:.6;cursor:wait}
 .btn-primary{background:var(--amber);color:#20160A;width:100%}
 .btn-primary:hover{background:#FFC272}
-.btn-ghost{background:var(--surface-2);border:1px solid var(--line)}
+.btn-ghost{background:var(--surface-2);border:1px solid var(--line);color:var(--text)}
 .btn-ghost:hover{background:#22343c}
 .switch-auth{margin-top:18px;font-size:13.5px;color:var(--muted);text-align:center}
 .switch-auth button{color:var(--cyan);font-weight:500}
@@ -87,7 +87,8 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 /* ============ CALL ============ */
 .call{flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
 .call-top{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);flex-shrink:0}
-.room-chip{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:9px;background:var(--surface);border:1px solid var(--line);font-family:var(--font-mono);font-size:13px}
+.room-chip{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:9px;background:var(--surface);border:1px solid var(--line);font-family:var(--font-mono);font-size:13px;max-width:60vw}
+.room-chip>span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .room-chip .live{display:flex;align-items:center;gap:6px;color:var(--amber);font-size:11px;letter-spacing:.08em}
 .room-chip .live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--amber);animation:pulse 2s infinite}
 .call-top .timer{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
@@ -348,6 +349,45 @@ input{font-family:inherit;font-size:inherit;color:inherit}
     .call.phone .workspace{top:calc(44px + env(safe-area-inset-top));left:150px;border-top:none;border-left:1px solid var(--line);padding-bottom:calc(60px + env(safe-area-inset-bottom))}
   }
 }
+
+/* ---- Cove Rooms: door, knocks, report, host editor ---- */
+.door{align-items:center;justify-content:center;padding:32px 20px}
+.door-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:28px}
+.door-host{display:flex;align-items:center;gap:14px;margin:22px 0 14px}
+.door-host h2{font-family:var(--font-display);font-weight:600;font-size:22px;letter-spacing:-.02em;line-height:1.15}
+.door-status{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:12px;font-size:14px;background:var(--surface-2);border:1px solid var(--line)}
+.door-status .lamp{width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.door-status.in .lamp{background:var(--green);box-shadow:0 0 10px rgba(74,222,128,.7)}
+.door-status.in{border-color:rgba(74,222,128,.3)}
+.door-pay{margin-top:12px;padding:13px 14px;border-radius:12px;background:var(--amber-dim);border:1px solid rgba(255,180,84,.3);display:flex;flex-direction:column;gap:6px;font-size:13.5px;color:var(--muted)}
+.door-pay b{color:var(--text)}
+.door-pay .btn{margin-top:4px;font-size:13.5px}
+.door .btn-primary{width:100%}
+.door-wait h3{font-family:var(--font-display);font-weight:600;font-size:18px;margin-bottom:6px}
+.door-wait p{color:var(--muted);font-size:14px}
+.knock-dots{display:flex;gap:6px;margin-top:14px}
+.knock-dots i{width:8px;height:8px;border-radius:50%;background:var(--amber);animation:pulse 1.2s infinite}
+.knock-dots i:nth-child(2){animation-delay:.2s}.knock-dots i:nth-child(3){animation-delay:.4s}
+.knocks{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:65;display:flex;flex-direction:column;gap:8px;width:min(420px,calc(100% - 24px))}
+.knock{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--surface);border:1px solid rgba(255,180,84,.45);box-shadow:0 10px 30px rgba(0,0,0,.4);font-size:14px}
+.knock span{flex:1}
+.report-ta{width:100%;min-height:110px;resize:vertical;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:10px 12px;font:inherit;font-size:15px}
+.report-ta:focus{border-color:var(--amber);outline:none}
+.myroom{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+.myroom-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.myroom-head h3{font-family:var(--font-display);font-weight:600;font-size:17px}
+.myroom-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.myroom-actions{display:flex;gap:6px;flex-shrink:0}
+.muted{color:var(--muted)}.mono{font-family:var(--font-mono);font-size:12px}
+.myroom-form{margin-top:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:14px}
+.slugrow{display:flex;align-items:center;gap:6px}
+.slugrow input{flex:1}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12.5px;padding:6px 11px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+.chip.on{color:var(--text);border-color:rgba(255,180,84,.5);background:var(--amber-dim)}
+.call.phone .knocks{top:calc(56px + env(safe-area-inset-top))}
+.ctl[href]{text-decoration:none}
+.ph-sheet a.row{color:var(--text);text-decoration:none}
 
 /* Safari autoplay-recovery prompt */
 .unblock{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);z-index:95;padding:12px 20px;border-radius:12px;background:var(--amber);color:#20160A;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.45)}
