@@ -47,6 +47,9 @@ const io = new Server(server, {
 app.use(cors({ origin: CLIENT_ORIGIN }));
 app.use(express.json());
 
+// Reject query operators smuggled in request bodies ({ email: { $gt: '' } }):
+// filters built from user input are treated as literal values.
+mongoose.set('sanitizeFilter', true);
 mongoose.connect(MONGODB_URI).catch((err) => {
   console.error('FATAL: MongoDB connection failed:', err.message);
   process.exit(1);

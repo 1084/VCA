@@ -45,6 +45,7 @@ const reportSchema = new mongoose.Schema({
   ts: { type: Date, default: Date.now },
   handled: { type: Boolean, default: false }
 });
+reportSchema.index({ ts: 1 }, { expireAfterSeconds: 365 * 86400 }); // reports live one year
 const Report = mongoose.model('Report', reportSchema);
 
 const hostEmails = () => (process.env.HOST_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
