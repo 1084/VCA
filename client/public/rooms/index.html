@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cove Rooms — a lesson room you rent, not a platform that takes a cut</title>
+  <meta name="description" content="Rent a private video room by the month or the day. Your students tap a link — no download, no account. You keep every dollar they pay you and every tip. Nothing collected, nothing sold. Small on purpose." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Inter:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root{--ink:#0C1518;--surface:#132026;--surface-2:#1A2A31;--line:rgba(232,239,240,.09);--text:#E8EFF0;--muted:#8CA1A7;--amber:#FFB454;--amber-dim:rgba(255,180,84,.16);--cyan:#7CCFDE;--green:#4ADE80;--radius:14px;
+      --display:"Bricolage Grotesque",sans-serif;--body:"Inter",sans-serif;--mono:"Spline Sans Mono",monospace}
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{background:var(--ink);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+    a{color:var(--cyan)}
+    .wrap{width:min(1080px,100% - 40px);margin:0 auto}
+    header{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+    .mark{display:inline-flex;align-items:center;gap:9px;font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.01em;color:var(--text);text-decoration:none}
+    .mark .dot{width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:0 0 12px rgba(255,180,84,.7)}
+    .mark small{font-weight:400;color:var(--muted);font-size:14px;margin-left:2px}
+    nav a{color:var(--muted);text-decoration:none;font-size:14px;margin-left:22px}
+    nav a:hover{color:var(--text)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 18px;border-radius:10px;font-weight:600;text-decoration:none;font-size:15px}
+    .btn-primary{background:var(--amber);color:#20160A}
+    .btn-primary:hover{background:#FFC272}
+    .btn-ghost{background:var(--surface-2);border:1px solid var(--line);color:var(--text)}
+    .btn-ghost:hover{background:#22343c}
+    .hero{padding:72px 0 56px;display:grid;grid-template-columns:1.15fr 1fr;gap:48px;align-items:center;
+      background:radial-gradient(900px 500px at 10% 110%, rgba(255,180,84,.10), transparent 60%),radial-gradient(700px 400px at 95% -10%, rgba(124,207,222,.07), transparent 60%)}
+    .hero h1{font-family:var(--display);font-weight:600;letter-spacing:-.03em;font-size:clamp(34px,4.6vw,58px);line-height:1.06;max-width:14ch}
+    .hero h1 em{font-style:normal;color:var(--amber)}
+    .hero p.sub{color:var(--muted);font-size:17px;max-width:46ch;margin:20px 0 28px}
+    .hero .cta{display:flex;gap:10px;flex-wrap:wrap}
+    .hero .fine{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--muted);margin-top:18px;text-transform:uppercase}
+    .room{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 30px 60px rgba(0,0,0,.35)}
+    .room .bar{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--muted);padding:4px 6px 12px}
+    .room .bar .live{color:var(--amber)}
+    .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .tile{aspect-ratio:4/3;border-radius:12px;position:relative;overflow:hidden;background:var(--surface-2)}
+    .tile .face{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:46%;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:600;font-size:26px;color:#0C1518}
+    .tile .name{position:absolute;left:8px;bottom:8px;font-size:11px;padding:3px 8px;border-radius:7px;background:rgba(12,21,24,.72)}
+    .room .notes{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:var(--muted)}
+    .room .notes b{color:var(--text);font-weight:600}
+    .room .ctl{display:flex;justify-content:center;gap:10px;margin-top:12px}
+    .room .ctl i{width:36px;height:36px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);display:block}
+    .room .ctl i.red{background:#FF5C5C;border-color:#FF5C5C;width:72px;border-radius:18px}
+    section{padding:56px 0;border-top:1px solid var(--line)}
+    h2{font-family:var(--display);font-weight:600;letter-spacing:-.02em;font-size:clamp(26px,3vw,36px);line-height:1.15;margin-bottom:12px}
+    .lede{color:var(--muted);max-width:60ch;font-size:16.5px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+    .card h3{font-family:var(--display);font-weight:600;font-size:18px;margin-bottom:8px}
+    .card p{color:var(--muted);font-size:14.5px}
+    .card .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--amber);text-transform:uppercase;margin-bottom:10px;display:block}
+    .compare{margin-top:28px;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+    .compare table{width:100%;border-collapse:collapse;font-size:14.5px}
+    .compare th,.compare td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+    .compare th{background:var(--surface);font-weight:600;font-family:var(--display);font-size:15px}
+    .compare td:first-child{color:var(--muted)}
+    .compare td.us{color:var(--text);font-weight:500}
+    .compare .yes{color:var(--green)}
+    .compare .no{color:#FFA3A3}
+    .pricing{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px;max-width:760px}
+    .price{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px}
+    .price.hi{border-color:rgba(255,180,84,.45);background:linear-gradient(180deg,rgba(255,180,84,.08),transparent 60%),var(--surface)}
+    .price .n{font-family:var(--display);font-weight:600;font-size:18px}
+    .price .amt{font-family:var(--display);font-weight:600;font-size:44px;letter-spacing:-.03em;margin:8px 0 2px}
+    .price .amt small{font-size:15px;color:var(--muted);letter-spacing:0;font-weight:400}
+    .price ul{list-style:none;margin:14px 0 20px}
+    .price li{color:var(--muted);font-size:14.5px;padding:5px 0 5px 22px;position:relative}
+    .price li::before{content:"✓";position:absolute;left:0;color:var(--amber)}
+    .math{margin-top:18px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-size:14.5px;color:var(--muted);max-width:760px}
+    .math b{color:var(--text)}
+    .trust{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
+    .trust .card p{font-size:15px}
+    details{border-bottom:1px solid var(--line);padding:16px 0}
+    details summary{cursor:pointer;font-weight:600;font-size:16px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+    details summary::after{content:"+";color:var(--muted);font-size:20px}
+    details[open] summary::after{content:"–"}
+    details p{color:var(--muted);margin-top:10px;max-width:70ch}
+    .apply{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:36px;display:grid;grid-template-columns:1.2fr 1fr;gap:32px;align-items:center;margin-top:28px}
+    .apply h2{margin-bottom:8px}
+    .apply ol{color:var(--muted);padding-left:20px;font-size:15px}
+    .apply ol li{margin:6px 0}
+    .apply .box{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:22px}
+    .apply .box p{color:var(--muted);font-size:14px;margin-bottom:14px}
+    footer{padding:36px 0 48px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+    footer a{color:var(--muted)}
+    footer .row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+    @media(max-width:820px){
+      .hero{grid-template-columns:1fr;padding:44px 0 40px}
+      .grid,.trust,.pricing,.apply{grid-template-columns:1fr}
+      nav a:not(.btn){display:none}
+      nav a.btn{margin-left:0}
+      .compare th,.compare td{padding:11px 10px;font-size:13.5px}
+      section{padding:44px 0}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="mark" href="/rooms/"><span class="dot"></span>Cove <small>Rooms</small></a>
+      <nav>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#trust">Trust</a>
+        <a href="#faq">FAQ</a>
+        <a href="/" class="btn btn-ghost" style="padding:8px 14px;font-size:14px;margin-left:18px">Open the app</a>
+      </nav>
+    </header>
+
+    <div class="hero">
+      <div>
+        <h1>A lesson room you <em>rent</em>, not a platform that takes a cut.</h1>
+        <p class="sub">Your students tap a link. No download, no account, no forty-minute cap. You pay flat rent for the room and keep every dollar your students pay you, and every tip. We collect nothing and sell nothing.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="#apply">Apply for a room</a>
+          <a class="btn btn-ghost" href="#how">See how it works</a>
+        </div>
+        <p class="fine">Small on purpose · No investors · No cut · Invitation only</p>
+      </div>
+      <div class="room" aria-hidden="true">
+        <div class="bar"><span><span class="live">● LIVE</span>&nbsp; MRS-ORTIZ</span><span>01:12 · 2/10</span></div>
+        <div class="tiles">
+          <div class="tile"><div class="face" style="background:linear-gradient(135deg,#FFB454,#F5A0C0)">MO</div><span class="name">Ms. Ortiz (host)</span></div>
+          <div class="tile"><div class="face" style="background:linear-gradient(135deg,#7CCFDE,#8FE3B0)">JP</div><span class="name">Jamie</span></div>
+        </div>
+        <div class="notes"><b>Notes · lesson 7</b> &nbsp;☐ preterite vs. imperfect &nbsp;☐ ser / estar review &nbsp;☐ homework: 10 sentences<br>[4:12] Jamie nailed the past tense story 🎉</div>
+        <div class="ctl"><i></i><i></i><i class="red"></i></div>
+      </div>
+    </div>
+
+    <section id="how">
+      <h2>How it works</h2>
+      <p class="lede">A Cove room is a private video room for up to ten people that belongs to you. It has a name, a link, a lockable door, and walls that remember what you put on them.</p>
+      <div class="grid">
+        <div class="card"><span class="k">1 · Rent</span><h3>Pick a room and a theme</h3><p>Monthly, or a day pass for a one-off. Choose a tutoring room, a meeting room, a study hall or a plain room. Themes are just what's on the walls when you walk in.</p></div>
+        <div class="card"><span class="k">2 · Share</span><h3>Send one link</h3><p>Your students open it in any browser on any phone or computer. Nothing to install, nothing to sign up for. You decide who's in; the door locks and strangers knock.</p></div>
+        <div class="card"><span class="k">3 · Teach</span><h3>Notes that don't vanish</h3><p>Shared notes stay with the room between lessons. Ask the room a question and get a show of hands. Export the lesson log any time for your own records.</p></div>
+      </div>
+      <div class="compare">
+        <table>
+          <tr><th></th><th>Cove Rooms</th><th>Tutoring platforms</th><th>Zoom / Meet (free)</th></tr>
+          <tr><td>What you pay</td><td class="us">Flat rent for the room</td><td>18–33% of every lesson; often the whole first lesson</td><td>Nothing, with limits</td></tr>
+          <tr><td>What students need</td><td class="us"><span class="yes">A link</span></td><td>An account on the platform</td><td>An account or an app</td></tr>
+          <tr><td>Tips</td><td class="us"><span class="yes">100% yours</span>, paid straight to you</td><td>Through the platform, less fees</td><td>—</td></tr>
+          <tr><td>Time limit</td><td class="us"><span class="yes">None</span></td><td>Per booked lesson</td><td>40 min / 60 min for groups</td></tr>
+          <tr><td>Notes between lessons</td><td class="us"><span class="yes">Kept with the room</span></td><td>Sometimes</td><td><span class="no">Gone when the call ends</span></td></tr>
+          <tr><td>Data collected about students</td><td class="us"><span class="yes">None</span></td><td>Profiles, behaviour, marketing</td><td>Account data, usage analytics</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <h2>Pricing</h2>
+      <p class="lede">Rent, not commission. The room costs the same whether you teach two lessons or forty.</p>
+      <div class="pricing">
+        <div class="price hi">
+          <div class="n">Monthly lease</div>
+          <div class="amt">$12<small> / month</small></div>
+          <ul>
+            <li>Your own room and link, up to 10 people</li>
+            <li>Notes, polls and hand queue kept with the room</li>
+            <li>A front-door page: what you teach, how to book, your tip link</li>
+            <li>Personal onboarding, including moving your first students over</li>
+            <li>Cancel any time; no contract</li>
+          </ul>
+          <a class="btn btn-primary" href="#apply">Apply for a room</a>
+        </div>
+        <div class="price">
+          <div class="n">Day pass</div>
+          <div class="amt">$2<small> / 24 hours</small></div>
+          <ul>
+            <li>A room for one day: a family call, a club meeting, a one-off session</li>
+            <li>Same room, same features, no time cap</li>
+            <li>Nothing to cancel; it simply expires</li>
+          </ul>
+          <a class="btn btn-ghost" href="#apply">Ask about a day pass</a>
+        </div>
+      </div>
+      <div class="math">
+        <b>The math, plainly.</b> A tutor teaching twenty $30 lessons a month pays a platform roughly $110–$200 in commission. The same month here costs $12, and every tip is yours. We can price it this way because a room costs us almost nothing to run and we have no investors to repay.
+      </div>
+    </section>
+
+    <section id="moonlight">
+      <h2>Already on Preply, italki or Wyzant? Keep them.</h2>
+      <p class="lede">Many tutors use the big platforms to meet new students and a Cove room for the ones who stay. Your platform schedule doesn't change. Your private students get a better room, and you keep what they pay. The first month covers itself after one lesson.</p>
+    </section>
+
+    <section id="trust">
+      <h2>Small on purpose</h2>
+      <p class="lede">We're a small studio in Virginia, not a marketplace. There's no feed, no discovery, no ranking, and no one is admitted without a conversation. Here is exactly how the rooms stay trustworthy.</p>
+      <div class="trust">
+        <div class="card"><h3>Invitation only</h3><p>Every host applies, talks with us on a short video call, and agrees to a plain conduct rule. We know who holds every room.</p></div>
+        <div class="card"><h3>Private by construction</h3><p>Rooms aren't listed anywhere. The host decides who enters, the door locks, and strangers can only knock. There is no platform recording.</p></div>
+        <div class="card"><h3>We can't see inside, and we say so</h3><p>Video goes directly between the people in the room and is encrypted end to end. We don't store notes beyond your room, we don't read chat, and we don't sell anything about anyone.</p></div>
+        <div class="card"><h3>Reports reach a person</h3><p>Every participant has a report button. It sends us the room, the time and your words, never any video. We can close a room or remove a host in minutes, and we do.</p></div>
+      </div>
+      <p class="lede" style="margin-top:22px;font-size:14.5px">Teaching children? Guests have no accounts and we collect nothing from them, so a parent's involvement works the way it does for any private lesson: the tutor has the parent's knowledge, a parent books for younger children, and parents are always welcome in the room. Our conduct rule and privacy policy spell this out.</p>
+    </section>
+
+    <section id="faq">
+      <h2>Questions</h2>
+      <details><summary>Do my students need to install anything?</summary><p>No. The room opens in Safari, Chrome, Firefox or Edge on a phone, tablet or computer. There's no app and no account for students.</p></details>
+      <details><summary>How do I get paid?</summary><p>However you already do: Venmo, Zelle, PayPal, Cash App, your own Stripe link, cash. Cove is never in the middle of lesson money. The tip button in your room opens your own link, so tips go straight to you.</p></details>
+      <details><summary>What do you store?</summary><p>For hosts: an email, the room's name and settings, and whether rent is paid (payments are handled by Stripe; we never see card numbers). For the room: the shared notes, which you can clear or export at any time. For safety: who hosted a room and when people joined and left, kept for thirty days and then deleted. Nothing else, and nothing from guests.</p></details>
+      <details><summary>How many people fit?</summary><p>Ten, including you. Rooms are built for lessons, small groups and family calls, not webinars.</p></details>
+      <details><summary>Can I run a group class?</summary><p>Yes. The hand queue shows who asked first, polls give you a show of hands, and the notes are shared, so a study group or a conversation class works well. The cap is still ten.</p></details>
+      <details><summary>What happens if I stop paying?</summary><p>The room closes at the end of the paid period. Your notes stay exportable for thirty days, then they're deleted.</p></details>
+      <details><summary>Why invitation only?</summary><p>Because we can't see inside rooms, we make sure we know who holds them. It keeps the community small and trusted, and it keeps us able to respond to a report in minutes rather than days.</p></details>
+    </section>
+
+    <section id="apply-s">
+      <div class="apply" id="apply">
+        <div>
+          <h2>Apply for a room</h2>
+          <ol>
+            <li>Tell us what you teach, where you teach now, and how you bill students.</li>
+            <li>We'll set up a fifteen-minute call in a Cove room so you can see it and we can meet you.</li>
+            <li>If it's a fit, your room is ready the same day. The first month is on us.</li>
+          </ol>
+        </div>
+        <div class="box">
+          <p>We're starting with a handful of tutors and small groups. If that's you, write to us and we'll reply personally.</p>
+          <a class="btn btn-primary" style="width:100%" href="mailto:support@johnhubert.llc?subject=Cove%20Rooms%20application&body=What%20I%20teach%3A%0AWhere%20I%20teach%20now%20(link)%3A%0AHow%20I%20bill%20students%3A%0AAnything%20else%3A">Email your application</a>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="row">
+        <span>© 2026 John Hubert LLC · Virginia · <a href="https://johnhubert.llc/">johnhubert.llc</a></span>
+        <span><a href="https://johnhubert.llc/privacy.html">Privacy</a> · <a href="mailto:support@johnhubert.llc">support@johnhubert.llc</a></span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
