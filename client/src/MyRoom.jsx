@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { whoAmI, saveRoom, deleteRoom, roomUrl } from './lib';
 
-const THEMES = [['plain', 'Plain room'], ['tutoring', 'Tutoring'], ['meeting', 'Meeting'], ['study', 'Study hall'], ['family', 'Family']];
+const THEMES = [['plain', 'Plain room'], ['tutoring', 'Tutoring'], ['language', 'Language lesson'], ['meeting', 'Meeting'], ['study', 'Study hall'], ['family', 'Family']];
 
 /** Host-only panel in the lobby: create or edit the rooms you hold. */
 export default function MyRoom({ session, onOpen }) {
@@ -17,7 +17,7 @@ export default function MyRoom({ session, onOpen }) {
 
   if (!me || !me.host) return null;
 
-  const blank = { slug: '', name: '', theme: 'tutoring', locked: true, tipLink: '', payLink: '', payNote: '' };
+  const blank = { slug: '', name: '', theme: 'tutoring', locked: true, tipLink: '', payLink: '', payNote: '', translate: false };
   const save = async () => {
     setBusy(true); setErr('');
     try { await saveRoom(session.token, { ...edit, acceptTerms: agree || !!me.termsAcceptedAt }); setEdit(null); await load(); }
@@ -59,6 +59,15 @@ export default function MyRoom({ session, onOpen }) {
           <div className="field"><label>Room name</label><input value={edit.name} maxLength={60} placeholder="Spanish with Ms. Ortiz" onChange={(e) => set('name', e.target.value)} /></div>
           <div className="field"><label>Theme</label>
             <div className="chips">{THEMES.map(([v, l]) => <button key={v} className={`chip ${edit.theme === v ? 'on' : ''}`} onClick={() => set('theme', v)}>{l}</button>)}</div></div>
+          {edit.theme === 'language' && (
+            <div className="field"><label>Language lesson</label>
+              <p className="muted" style={{ fontSize: 13, margin: '0 0 8px' }}>Live captions: each person's phone transcribes their own voice on the device and shares the text. No audio leaves anyone's phone.</p>
+              <label className="agree" style={{ margin: 0 }}>
+                <input type="checkbox" checked={!!edit.translate} onChange={(e) => set('translate', e.target.checked)} />
+                <span>Also translate captions. Spoken words are sent <b>as text</b> to a translation service (DeepL) with nothing identifying anyone attached, so each person reads in their own language. Off = captions in the language spoken.</span>
+              </label>
+            </div>
+          )}
           <div className="field"><label>Door</label>
             <div className="chips"><button className={`chip ${edit.locked ? 'on' : ''}`} onClick={() => set('locked', true)}>Locked: guests knock, you admit</button>
               <button className={`chip ${!edit.locked ? 'on' : ''}`} onClick={() => set('locked', false)}>Open: anyone with the link walks in</button></div></div>

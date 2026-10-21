@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import usePhone, { useKeyboardInset } from './usePhone';
+import useCaptions, { LANGS, speechSupported } from './useCaptions';
 import { socket, initials, gradFor, STUN_ONLY, fetchIceServers } from './lib';
 import useMesh from './useMesh';
 import Notes, { useNotesDoc, appendLine, notesText } from './collab/Notes';
@@ -143,6 +144,19 @@ export default function CallScreen({ session, call, onLeave }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportText, setReportText] = useState('');
   const isHost = !!room && room.hostName === me && !session.guest;
+  // Language room: live captions
+  const isLang = room?.theme === 'language';
+  const [capOn, setCapOn] = useState(true);
+  const [capLang, setCapLang] = useState(() => { try { return localStorage.getItem('cove-caption-lang') || (navigator.language?.startsWith('es') ? 'es-ES' : 'en-US'); } catch { return 'en-US'; } });
+  const [captions, setCaptions] = useState([]);      // final captions, last 40
+  const [interim, setInterim] = useState({});        // id -> live partial text
+  const [langPick, setLangPick] = useState(false);
+  const capsRef = useRef(null);
+  const sendCaption = useCallback((text, final) => socket.emit('caption', { text, lang: capLang, final }), [capLang]);
+  const caps = useCaptions({ enabled: isLang && capOn, lang: capLang, micOn,
+    onFinal: (t) => sendCaption(t, true), onInterim: (t) => sendCaption(t, false) });
+  useEffect(() => { if (isLang) { socket.emit('caption-lang', capLang); try { localStorage.setItem('cove-caption-lang', capLang); } catch { /* fine */ } } }, [isLang, capLang]);
+  useEffect(() => { capsRef.current?.scrollTo?.({ top: 1e9, behavior: 'smooth' }); }, [captions, interim]);
   const notesRef = useRef(null); notesRef.current = notes.doc;
   const [wsOn, setWsOn] = useState(false);
   const [wsEverOn, setWsEverOn] = useState(false);
@@ -237,6 +251,11 @@ export default function CallScreen({ session, call, onLeave }) {
     const onKnock = ({ id, name }) => setKnocks((k) => (k.some((x) => x.id === id) ? k : [...k, { id, name }]));
     const onKnockGone = ({ id }) => setKnocks((k) => k.filter((x) => x.id !== id));
     const onReported = () => { setReportOpen(false); setReportText(''); toast('Report sent. A person will read it.'); };
+    const onCaption = (c) => {
+      if (c.final) { setInterim((m) => { const n = { ...m }; delete n[c.id]; return n; }); setCaptions((l) => [...l.slice(-39), c]); }
+      else setInterim((m) => ({ ...m, [c.id]: { from: c.from, text: c.text } }));
+    };
+    socket.on('caption', onCaption);
     socket.on('room-state', onRoomState);
     socket.on('knocking', onKnocking);
     socket.on('admitted', onAdmitted);
@@ -272,6 +291,7 @@ export default function CallScreen({ session, call, onLeave }) {
       socket.off('knock', onKnock);
       socket.off('knock-gone', onKnockGone);
       socket.off('reported', onReported);
+      socket.off('caption', onCaption);
       socket.off('reaction', onReaction);
       socket.off('poll', onPoll);
       socket.off('room-full', onFull);
@@ -431,6 +451,38 @@ export default function CallScreen({ session, call, onLeave }) {
   const removePeer = (id) => { if (window.confirm('Remove this person from the room?')) socket.emit('remove', { id }); };
   const sendReport = () => { if (reportText.trim()) socket.emit('report', { text: reportText.trim() }); };
   const tipLink = room?.tipLink || '';
+  const saveCaption = (c) => { appendLine(notes.doc, c.translated ? `${c.from}: ${c.text} — ${c.translated}` : `${c.from}: ${c.text}`); toast('Added to notes'); };
+  const captionLane = isLang && (
+    <div className="caps" ref={capsRef} aria-live="polite">
+      {captions.slice(-6).map((c, i) => (
+        <div key={c.ts + i} className={`cap ${c.id === socket.id ? 'me' : ''}`} onClick={() => saveCaption(c)} title="Tap to add to notes">
+          <span className="who">{c.from}</span>
+          <span className="txt">{c.text}</span>
+          {c.translated && <span className="tr">{c.translated}</span>}
+        </div>
+      ))}
+      {Object.entries(interim).map(([id, v]) => (
+        <div key={id} className="cap interim"><span className="who">{v.from}</span><span className="txt">{v.text}…</span></div>
+      ))}
+      {captions.length === 0 && Object.keys(interim).length === 0 && (
+        <div className="cap hint">{caps.supported ? (caps.listening ? 'Listening — captions appear here as people speak.' : capOn ? (micOn ? 'Starting captions…' : 'Unmute to caption your voice.') : 'Captions off.') : 'This browser can\'t transcribe; you\'ll still see others\' captions.'}{caps.error ? ` ${caps.error}` : ''}</div>
+      )}
+    </div>
+  );
+  const langSheet = langPick && (
+    <div className="ph-scrim" style={{ zIndex: 75 }} onClick={() => setLangPick(false)}>
+      <div className="ph-sheet desk" role="dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="grab" />
+        <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Captions</h3>
+        <p style={{ color: 'var(--muted)', fontSize: 13.5, marginBottom: 10 }}>The language you'll speak. Your phone transcribes your voice on the device and shares the text{room?.translate ? '; others read it translated into their own language' : ''}.</p>
+        <div className="chips" style={{ marginBottom: 12 }}>
+          {LANGS.map(([code, label]) => <button key={code} className={`chip ${capLang === code ? 'on' : ''}`} onClick={() => setCapLang(code)}>{label}</button>)}
+        </div>
+        <label className="agree" style={{ margin: '4px 0 10px' }}><input type="checkbox" checked={capOn} onChange={(e) => setCapOn(e.target.checked)} /><span>Caption my voice</span></label>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setLangPick(false)}>Done</button>
+      </div>
+    </div>
+  );
   const roomTitle = room?.name || roomId;
 
   const mm = String((seconds / 60) | 0).padStart(2, '0');
@@ -560,6 +612,11 @@ export default function CallScreen({ session, call, onLeave }) {
           <button className={`ctl ${hand ? 'active' : ''}`} onClick={toggleHand} aria-pressed={hand} aria-label="Raise hand">
             {Icon.hand}{handCount > 0 && <b className="count">{handCount}</b>}
           </button>
+          {isLang && (
+            <button className={`ctl ${capOn && caps.listening ? 'active' : ''}`} onClick={() => setLangPick(true)} aria-label="Captions">
+              <b style={{ fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '.02em' }}>{capLang.slice(0, 2).toUpperCase()}</b>
+            </button>
+          )}
           <button className={`ctl ${openPolls.length ? 'active' : ''}`} onClick={() => setSheet(sheet === 'ask' ? null : 'ask')} aria-label="Ask the room">
             {Icon.poll}{openPolls.length > 0 && <b className="count">{openPolls.length}</b>}
           </button>
@@ -569,6 +626,7 @@ export default function CallScreen({ session, call, onLeave }) {
         </div>
 
         <div className="ph-bottom">
+          {!wsOn && captionLane}
           {!wsOn && openPolls.slice(-1).map((p) => (
             <PollCard key={p.id} poll={p} mine={myVotes[p.id]} isAsker={p.by === socket.id} compact
               onVote={(i) => vote(p.id, i)} onClose={() => closePoll(p.id)} />
@@ -676,7 +734,7 @@ export default function CallScreen({ session, call, onLeave }) {
             🔊 Tap to enable incoming audio &amp; video
           </button>
         )}
-        {doorOverlay}{reportDialog}
+        {doorOverlay}{reportDialog}{langSheet}
         <div className={`toast ${toastMsg ? 'on' : ''}`} role="status">{toastMsg}</div>
       </section>
     );
@@ -696,7 +754,7 @@ export default function CallScreen({ session, call, onLeave }) {
       </div>
 
       <div className={`call-body ${wsOn ? 'ws' : ''}`}>
-        <div className="stage">{tiles}</div>
+        <div className="stage-col"><div className="stage">{tiles}</div>{captionLane}</div>
 
         {wsEverOn && (
           <div className="workspace">
@@ -777,6 +835,11 @@ export default function CallScreen({ session, call, onLeave }) {
           onClick={() => setPanel(panel === 'people' ? null : 'people')}>
           {Icon.people}<span>People</span>
         </button>
+        {isLang && (
+          <button className={`ctl ${capOn && caps.listening ? 'active' : ''}`} onClick={() => setLangPick(true)} title="Captions and language">
+            <span style={{ fontSize: 13, lineHeight: '19px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{capLang.slice(0, 2).toUpperCase()}</span><span>Captions</span>
+          </button>
+        )}
         {isHost && (
           <button className={`ctl ${room.locked ? 'active' : ''}`} onClick={() => setLock(!room.locked)} title={room.locked ? 'Door locked: guests knock' : 'Door open'}>
             <span style={{ fontSize: 18, lineHeight: '19px' }}>{room.locked ? '🔒' : '🔓'}</span><span>Door</span>
@@ -807,7 +870,7 @@ export default function CallScreen({ session, call, onLeave }) {
         </div>
       )}
       {handQueue.length > 0 && <div className="queue-chip">✋ {handQueue.map(([, p]) => p.name).join(' → ')}</div>}
-      {knockBanner}{doorOverlay}{reportDialog}
+      {knockBanner}{doorOverlay}{reportDialog}{langSheet}
       {playBlocked && (
         <button className="unblock" onClick={unblockPlayback}>
           🔊 Tap to enable incoming audio &amp; video

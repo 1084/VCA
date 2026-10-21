@@ -16,7 +16,7 @@ const { Room, Report, roomIsOpen } = require('./rooms');
 
 const nameOf = (user) => (user?.name || (user?.email || 'guest').split('@')[0]).slice(0, 32);
 
-function attachSignaling(io, { maxRoomSize = 10 } = {}) {
+function attachSignaling(io, { maxRoomSize = 10, translate = null } = {}) {
   io.on('connection', (socket) => {
     const displayName = () => nameOf(socket.user);
     const isGuest = () => !!socket.user?.guest;
@@ -28,7 +28,7 @@ function attachSignaling(io, { maxRoomSize = 10 } = {}) {
       let hostPresent = false;
       for (const id of set || []) if (io.sockets.sockets.get(id)?.user?.email === named.ownerEmail) hostPresent = true;
       return { slug: named.slug, name: named.name, theme: named.theme, locked: !!named.locked, tipLink: named.tipLink || '',
-        payLink: named.payLink || '', payNote: named.payNote || '', hostName: (named.ownerEmail || '').split('@')[0], hostPresent };
+        payLink: named.payLink || '', payNote: named.payNote || '', translate: !!named.translate, hostName: (named.ownerEmail || '').split('@')[0], hostPresent };
     };
     const hostSockets = (named) => [...io.sockets.sockets.values()].filter((s) => s.user?.email === named.ownerEmail && s.data.roomId === named.slug);
 
@@ -135,6 +135,38 @@ function attachSignaling(io, { maxRoomSize = 10 } = {}) {
         sharing: !!s?.sharing
       });
     });
+
+    // ---- Live captions (Language room) ----
+    // Text only: each phone transcribes its own speaker. Interim captions are
+    // relayed without translation; final ones are translated when the room's
+    // host turned translation on, then sent to everyone.
+    const captionLimiter = { n: 0, at: 0 };
+    socket.on('caption', async ({ text, lang, final } = {}) => {
+      const roomId = socket.data.roomId;
+      if (!roomId || typeof text !== 'string' || !text.trim()) return;
+      const now = Date.now();
+      if (now - captionLimiter.at > 10000) { captionLimiter.n = 0; captionLimiter.at = now; }
+      if (++captionLimiter.n > 120) return; // runaway client
+      const t = text.trim().slice(0, 500);
+      const src = typeof lang === 'string' ? lang.slice(0, 8) : '';
+      const base = { id: socket.id, from: displayName(), text: t, lang: src, final: !!final, ts: now };
+      if (!final) return io.in(roomId).emit('caption', base);
+      const named = await Room.findOne({ slug: roomId }).lean().catch(() => null);
+      if (!named?.translate || !translate) return io.in(roomId).emit('caption', base);
+      // translate into each listener's language, grouped so one call serves many
+      const targets = new Map();
+      for (const id of io.sockets.adapter.rooms.get(roomId) || []) {
+        const s = io.sockets.sockets.get(id);
+        const want = (s?.data.captionLang || 'en').slice(0, 2).toLowerCase();
+        if (want !== src.slice(0, 2).toLowerCase()) targets.set(want, [...(targets.get(want) || []), id]);
+        else io.to(id).emit('caption', base);
+      }
+      for (const [want, ids] of targets) {
+        const tr = await translate(t, src, want).catch(() => null);
+        ids.forEach((id) => io.to(id).emit('caption', { ...base, translated: tr || undefined, to: want }));
+      }
+    });
+    socket.on('caption-lang', (lang) => { if (typeof lang === 'string') socket.data.captionLang = lang.slice(0, 8); });
 
     socket.on('chat', (text) => {
       const roomId = socket.data.roomId;

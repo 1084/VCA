@@ -157,7 +157,8 @@ io.use((socket, next) => {
 
 // ---- Room signaling (mesh, up to MAX_ROOM_SIZE people) ----
 const { attachSignaling } = require('./signaling');
-attachSignaling(io, { maxRoomSize: Number(process.env.MAX_ROOM_SIZE) || 10 });
+const { makeTranslator } = require('./translate');
+attachSignaling(io, { maxRoomSize: Number(process.env.MAX_ROOM_SIZE) || 10, translate: makeTranslator(process.env) });
 
 // ---- Real-time collaboration (Yjs over WebSocket) ----
 // Socket.IO broadcasts are fine for WebRTC *signaling* (fire-and-forget

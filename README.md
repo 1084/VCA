@@ -176,6 +176,17 @@ Named rooms for invited hosts, guests without accounts, a lockable door, and a r
 - Tests: `cd server && npm test` runs the door flow against the real signaling module with
   an in-memory stand-in for Mongo.
 
+### Language room (2026-10-21)
+
+Theme `language` adds live captions. Each participant's browser transcribes their **own** voice with
+the Web Speech API (on-device dictation on iOS/Android) and sends text, never audio, as `caption`
+events; the lane under the stage shows everyone's captions, tap one to add it to Notes. The host
+can turn on **translate** for the room: final captions are sent as text to DeepL via the server
+(`DEEPL_API_KEY`; free keys end in `:fx`), translated into each listener's chosen language, and
+cached in memory. Without a key, captions show as spoken. Each person picks their language from
+the Captions button (`caption-lang`). Browser support: Safari iOS 14.5+, Chrome, Edge; Firefox has
+no speech recognition and only shows others' captions.
+
 ### Layout harness (no backend)
 
 ```

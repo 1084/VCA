@@ -16,7 +16,7 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 
 const SLUG_RX = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
-const THEMES = ['plain', 'tutoring', 'meeting', 'study', 'family'];
+const THEMES = ['plain', 'tutoring', 'meeting', 'study', 'family', 'language'];
 const RESERVED = new Set(['api', 'r', 'rooms', 'admin', 'collab', 'socket.io', 'assets', 'privacy', 'terms']);
 const GUEST_TTL = '12h';
 
@@ -29,6 +29,7 @@ const roomSchema = new mongoose.Schema({
   tipLink: { type: String, default: '' },
   payLink: { type: String, default: '' },
   payNote: { type: String, default: '' },      // e.g. "$15 per session"
+  translate: { type: Boolean, default: false }, // language room: send caption text to the translator (host opt-in)
   paidThrough: { type: Date, default: null },  // null = comped (invited host)
   createdAt: { type: Date, default: Date.now },
   lastSessionAt: { type: Date, default: Date.now } // the host was last in the room; drives expiry
@@ -110,7 +111,8 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
       locked: req.body?.locked !== false,
       tipLink: cleanLink(req.body?.tipLink),
       payLink: cleanLink(req.body?.payLink),
-      payNote: cleanText(req.body?.payNote, 80)
+      payNote: cleanText(req.body?.payNote, 80),
+      translate: theme === 'language' && req.body?.translate === true
     };
     const room = await Room.findOneAndUpdate({ slug }, doc, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.json(publicRoom(room));
@@ -196,7 +198,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
 }
 
 function publicRoom(r) {
-  return { slug: r.slug, name: r.name, theme: r.theme, locked: !!r.locked, tipLink: r.tipLink || '', payLink: r.payLink || '', payNote: r.payNote || '',
+  return { slug: r.slug, name: r.name, theme: r.theme, locked: !!r.locked, tipLink: r.tipLink || '', payLink: r.payLink || '', payNote: r.payNote || '', translate: !!r.translate,
     hostName: (r.ownerEmail || '').split('@')[0] };
 }
 

@@ -3,7 +3,7 @@
 // fake participants at phone sizes. Never imported by the real build.
 export { initials, gradFor, roomSlugFromPath, roomUrl, newRoomCode, ROOM_CODE_PATTERN } from '../src/lib.real';
 const Q = new URLSearchParams(location.search);
-const ROOM = { slug: 'ms-ortiz', name: 'Spanish with Ms. Ortiz', theme: 'tutoring', locked: Q.get('open') !== '1', tipLink: 'https://paypal.me/ortiz', payLink: Q.get('pay') === '1' ? 'https://paypal.me/ortiz/15' : '', payNote: '$15 per session', hostName: Q.get('host') === '1' ? 'testuser' : 'ortiz' };
+const ROOM = { slug: 'ms-ortiz', name: 'Spanish with Ms. Ortiz', theme: Q.get('lang') === '1' ? 'language' : 'tutoring', translate: Q.get('tr') === '1', locked: Q.get('open') !== '1', tipLink: 'https://paypal.me/ortiz', payLink: Q.get('pay') === '1' ? 'https://paypal.me/ortiz/15' : '', payNote: '$15 per session', hostName: Q.get('host') === '1' ? 'testuser' : 'ortiz' };
 export const roomInfo = async () => ({ ...ROOM, hostPresent: Q.get('away') !== '1', count: 3, startedAt: Date.now() - 120000 });
 export const guestKey = async (slug, name) => ({ token: 'guest', name, room: ROOM });
 export const whoAmI = async () => ({ email: 'testuser@example.com', host: true, maxRooms: 1, termsAcceptedAt: null, rooms: Q.get('norooms') === '1' ? [] : [{ ...ROOM, idleDays: 70, expiresInDays: 20 }] });
@@ -29,6 +29,7 @@ export const socket = {
   _fakeVotes: (n) => { const t = socket._poll; for (let i = 0; i < n; i++) t.counts[i % t.options.length]++, t.total++; (handlers.poll || []).forEach((f) => f({ ...t, counts: [...t.counts] })); },
   _peerState: (from, s) => (handlers['peer-state'] || []).forEach((f) => f({ from, ...s })),
   connect: () => { (handlers.connect || []).forEach((f) => f()); setTimeout(() => { if (Q.get('knock') === '1') (handlers.knocking || []).forEach((f) => f({ room: ROOM })); else if (Q.get('room') === '1' || Q.get('host') === '1') (handlers['room-state'] || []).forEach((f) => f({ ...ROOM, hostPresent: true })); }, 50); },
+  _caption: (c) => (handlers.caption || []).forEach((f) => f(c)),
   _knock: (name) => (handlers.knock || []).forEach((f) => f({ id: 'k' + name, name })),
   disconnect: () => {},
   // test hook: push a message from a fake peer
