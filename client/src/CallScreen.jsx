@@ -461,6 +461,7 @@ export default function CallScreen({ session, call, onLeave }) {
   const sendReport = () => { if (reportText.trim()) socket.emit('report', { text: reportText.trim() }); };
   const tipLink = room?.tipLink || '';
   const saveCaption = (c) => { appendLine(notes.doc, c.translated ? `${c.from}: ${c.text} — ${c.translated}` : `${c.from}: ${c.text}`); toast('Added to notes'); };
+  const chatUnread = msgs.slice(chatSeen).filter((m) => m.id !== socket.id).length;
   const captionLane = isLang && (
     <div className="caps" ref={capsRef} aria-live="polite">
       {captions.slice(-6).map((c, i) => (
@@ -473,15 +474,14 @@ export default function CallScreen({ session, call, onLeave }) {
       {Object.entries(interim).map(([id, v]) => (
         <div key={id} className="cap interim"><span className="who">{v.from}</span><span className="txt">{v.text}…</span></div>
       ))}
-      {phone && msgs.slice(-1).map((m, i) => (
-        <div key={'m' + i} className="cap chatcap" onClick={() => setBand('chat')} title="Open chat"><span className="who">💬 {m.id === socket.id ? 'You' : m.from}</span><span className="txt">{m.text}</span></div>
+      {phone && chatUnread > 0 && msgs.slice(-1).filter((m) => m.id !== socket.id).map((m, i) => (
+        <div key={'m' + i} className="cap chatcap" onClick={() => setBand('chat')} title="Open chat"><span className="who">💬 {m.from}</span><span className="txt">{m.text}</span></div>
       ))}
       {captions.length === 0 && Object.keys(interim).length === 0 && (
-        <div className="cap hint">{caps.supported ? (caps.listening ? 'Listening — captions appear here as people speak.' : capOn ? (micOn ? 'Starting captions…' : 'Unmute to caption your voice.') : 'Captions off.') : 'This browser can\'t transcribe; you\'ll still see others\' captions.'}{caps.error ? ` ${caps.error}` : ''}</div>
+        <div className="cap hint">{caps.error ? caps.error : caps.supported ? (caps.listening ? 'Listening — captions appear here as people speak.' : capOn ? (micOn ? 'Starting captions…' : 'Unmute to caption your voice.') : 'Captions off.') : 'This browser can\'t transcribe; you\'ll still see others\' captions.'}</div>
       )}
     </div>
   );
-  const chatUnread = msgs.slice(chatSeen).filter((m) => m.id !== socket.id).length;
   const chatBand = (
     <div className="caps chat-hist" ref={chatRef} aria-live="polite">
       {msgs.length === 0 && <div className="cap hint">No messages yet. Everyone in the room sees what you send here.</div>}

@@ -50,7 +50,14 @@ export default function useCaptions({ enabled, lang, micOn, onFinal, onInterim }
     };
     rec.onerror = (e) => {
       // 'no-speech' and 'aborted' are routine; anything else is worth showing once
-      if (e.error && !['no-speech', 'aborted'].includes(e.error)) setError(e.error === 'not-allowed' ? 'Microphone access is needed for captions.' : `Captions paused (${e.error}).`);
+      if (!e.error || ['no-speech', 'aborted'].includes(e.error)) return;
+      const ios = /iPhone|iPad/.test(navigator.userAgent);
+      setError(
+        e.error === 'not-allowed' ? 'Microphone access is needed for captions.'
+          : e.error === 'service-not-allowed' ? (ios ? 'Captions use the phone\'s dictation. Turn on Settings → General → Keyboard → Enable Dictation, then come back.' : 'This browser isn\'t allowed to transcribe here. Others\' captions still show.')
+          : e.error === 'network' ? 'Captions need a connection for a moment; retrying.'
+          : `Captions paused (${e.error}).`
+      );
     };
     rec.onstart = () => { setListening(true); setError(''); };
     // Browsers stop continuous recognition after a while (iOS ~1 min); restart while wanted.
