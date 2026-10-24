@@ -17,6 +17,7 @@ const jwt = require('jsonwebtoken');
 
 const SLUG_RX = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
 const THEMES = ['plain', 'tutoring', 'meeting', 'study', 'family', 'language'];
+const WALLS = ['', 'forest', 'dusk', 'clay', 'slate', 'plum'];
 const RESERVED = new Set(['api', 'r', 'rooms', 'admin', 'collab', 'socket.io', 'assets', 'privacy', 'terms']);
 const GUEST_TTL = '12h';
 
@@ -30,6 +31,18 @@ const roomSchema = new mongoose.Schema({
   payLink: { type: String, default: '' },
   payNote: { type: String, default: '' },      // e.g. "$15 per session"
   translate: { type: Boolean, default: false }, // language room: send caption text to the translator (host opt-in)
+  // ---- Studio (premium lease): the host's own public page + room look ----
+  studio: { type: Boolean, default: false },
+  tagline: { type: String, default: '' },      // "Alicia Ortiz · Cuernavaca · Spanish, chemistry"
+  about: { type: String, default: '' },        // in the host's language
+  aboutLang: { type: String, default: '' },
+  priceNote: { type: String, default: '' },    // "$30 per 50-minute lesson · packs of 4 for $110"
+  education: { type: String, default: '' },    // plain text, one per line
+  wall: { type: String, default: '' },         // one of WALLS
+  welcome: { type: String, default: '' },      // "{name}" is replaced with the guest's name
+  avail: { type: [Number], default: [] },      // 21 flags: day*3 + slot (morning/afternoon/evening)
+  tz: { type: String, default: '' },
+  photo: { type: String, default: '' },        // data: URL, ≤ 120 KB (small avatar)
   paidThrough: { type: Date, default: null },  // null = comped (invited host)
   createdAt: { type: Date, default: Date.now },
   lastSessionAt: { type: Date, default: Date.now } // the host was last in the room; drives expiry
@@ -55,7 +68,7 @@ const isHostEmail = (email) => hostEmails().includes(String(email || '').toLower
 const hostOf = async (User, email) => {
   const u = await User.findOne({ email }).lean();
   const host = !!(u?.host || isHostEmail(email));
-  return { user: u, host, maxRooms: u?.maxRooms || 1, termsAcceptedAt: u?.termsAcceptedAt || null };
+  return { user: u, host, maxRooms: u?.maxRooms || 1, termsAcceptedAt: u?.termsAcceptedAt || null, studio: !!u?.studio };
 };
 
 // Only http(s) links; the page opens them in a new tab. Nothing else.
@@ -67,11 +80,17 @@ function cleanLink(v) {
 }
 const cleanText = (v, n) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n) : '');
 
+// A small avatar as a data URL. Kept tiny so it lives happily in the room record.
+function cleanPhoto(v) {
+  if (typeof v !== 'string') return '';
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v) || v.length > 160_000) return '';
+  return v;
+}
 function roomIsOpen(room) {
   return !room.paidThrough || room.paidThrough.getTime() > Date.now();
 }
 
-function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDoc, authLimiter }) {
+function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDoc, authLimiter, translate = null }) {
   const admin = (req, res, next) => {
     if (!adminKey) return res.status(503).json({ error: 'ADMIN_KEY not configured' });
     if (req.get('authorization') !== `Bearer ${adminKey}`) return res.status(401).json({ error: 'Unauthorized' });
@@ -84,7 +103,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
     const email = req.user.email;
     const h = await hostOf(User, email);
     const rooms = h.host ? await Room.find({ ownerEmail: email }).lean() : [];
-    res.json({ email, host: h.host, maxRooms: h.maxRooms, termsAcceptedAt: h.termsAcceptedAt, termsVersion: TERMS_VERSION,
+    res.json({ email, host: h.host, studio: h.studio, maxRooms: h.maxRooms, termsAcceptedAt: h.termsAcceptedAt, termsVersion: TERMS_VERSION,
       rooms: rooms.map((r) => ({ ...publicRoom(r), idleDays: daysIdle(r), expiresInDays: Math.max(0, ROOM_IDLE_DAYS - daysIdle(r)) })) });
   });
 
@@ -114,6 +133,16 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
       payNote: cleanText(req.body?.payNote, 80),
       translate: theme === 'language' && req.body?.translate === true
     };
+    // Studio fields (any host may edit; the page shows them only while studio is on)
+    if (h.studio || existing?.studio) {
+      Object.assign(doc, {
+        tagline: cleanText(req.body?.tagline, 90), about: cleanText(req.body?.about, 1200), aboutLang: cleanText(req.body?.aboutLang, 8),
+        priceNote: cleanText(req.body?.priceNote, 120), education: cleanText(req.body?.education, 600),
+        wall: WALLS.includes(req.body?.wall) ? req.body.wall : '', welcome: cleanText(req.body?.welcome, 160),
+        avail: Array.isArray(req.body?.avail) ? req.body.avail.slice(0, 21).map((v) => (v ? 1 : 0)) : [], tz: cleanText(req.body?.tz, 40),
+        photo: cleanPhoto(req.body?.photo)
+      });
+    }
     const room = await Room.findOneAndUpdate({ slug }, doc, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.json(publicRoom(room));
   });
@@ -129,6 +158,16 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
     const room = await Room.findOne({ slug: req.params.slug }).lean();
     if (!room || !roomIsOpen(room)) return res.status(404).json({ error: 'No room at this link.' });
     res.json({ ...publicRoom(room), ...presence(io, room) });
+  });
+
+  // ---- translate the host's About for a visitor (text only; nothing stored) ----
+  app.get('/api/r/:slug/about', authLimiter, async (req, res) => {
+    const room = await Room.findOne({ slug: req.params.slug }).lean();
+    if (!room?.studio || !room.about) return res.status(404).json({ error: 'No page' });
+    const to = cleanText(req.query.to, 5).toLowerCase();
+    if (!translate || !to) return res.json({ text: room.about, translated: false });
+    try { res.json({ text: await translate(room.about, room.aboutLang, to), translated: true }); }
+    catch { res.json({ text: room.about, translated: false }); }
   });
 
   // ---- a guest asks for a key to one room (rate-limited like sign-in) ----
@@ -159,7 +198,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
   });
   // invite or revoke a host: { email, host: true|false, maxRooms? }
   app.get('/api/admin/hosts', admin, async (req, res) => {
-    res.json(await User.find({ host: true }, { email: 1, hostSince: 1, maxRooms: 1, termsAcceptedAt: 1, termsVersion: 1 }).lean());
+    res.json(await User.find({ host: true }, { email: 1, hostSince: 1, maxRooms: 1, studio: 1, termsAcceptedAt: 1, termsVersion: 1 }).lean());
   });
   app.post('/api/admin/hosts', admin, async (req, res) => {
     const email = cleanText(req.body?.email, 254).toLowerCase();
@@ -169,6 +208,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
     const host = req.body?.host !== false;
     const upd = { host, ...(host && !u.hostSince ? { hostSince: new Date() } : {}) };
     if (Number.isInteger(req.body?.maxRooms) && req.body.maxRooms >= 1 && req.body.maxRooms <= 10) upd.maxRooms = req.body.maxRooms;
+    if (typeof req.body?.studio === 'boolean') { upd.studio = req.body.studio; await Room.updateMany({ ownerEmail: email }, { studio: req.body.studio }); }
     await User.updateOne({ email }, upd);
     if (!host) {
       const rooms = await Room.find({ ownerEmail: email }).lean();
@@ -198,8 +238,11 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
 }
 
 function publicRoom(r) {
-  return { slug: r.slug, name: r.name, theme: r.theme, locked: !!r.locked, tipLink: r.tipLink || '', payLink: r.payLink || '', payNote: r.payNote || '', translate: !!r.translate,
-    hostName: (r.ownerEmail || '').split('@')[0] };
+  const base = { slug: r.slug, name: r.name, theme: r.theme, locked: !!r.locked, tipLink: r.tipLink || '', payLink: r.payLink || '', payNote: r.payNote || '', translate: !!r.translate,
+    hostName: (r.ownerEmail || '').split('@')[0], studio: !!r.studio };
+  if (r.studio) Object.assign(base, { tagline: r.tagline || '', about: r.about || '', aboutLang: r.aboutLang || '', priceNote: r.priceNote || '', education: r.education || '',
+    wall: r.wall || '', welcome: r.welcome || '', avail: r.avail || [], tz: r.tz || '', photo: r.photo || '' });
+  return base;
 }
 
 function presence(io, room) {

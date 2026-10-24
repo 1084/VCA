@@ -187,6 +187,17 @@ cached in memory. Without a key, captions show as spoken. Each person picks thei
 the Captions button (`caption-lang`). Browser support: Safari iOS 14.5+, Chrome, Edge; Firefox has
 no speech recognition and only shows others' captions.
 
+### Studio (2026-10-24)
+
+A premium lease flag on the host (`user.studio`, set with `POST /api/admin/hosts {email, studio:true}`).
+Studio hosts get a **Studio page** tab in the room editor: photo (resized to 192 px on the device,
+stored as a small data URL), tagline, About in their language (visitors can translate it:
+`GET /api/r/:slug/about?to=xx`, text only), price line, education, a wall color for the room, a
+welcome line with `{name}`, and a "usually available" grid (21 flags, a signal not a booking
+system). The front door at `/r/<slug>` shows all of it; the room takes the wall color and shows
+the welcome card for the first 45 s. Everything is the host's own public content; nothing about
+guests is collected. Revoking `studio` hides the page sections (data stays until the host clears it).
+
 ### Layout harness (no backend)
 
 ```

@@ -45,7 +45,7 @@ const io = new Server(server, {
 });
 
 app.use(cors({ origin: CLIENT_ORIGIN }));
-app.use(express.json());
+app.use(express.json({ limit: '256kb' })); // room records carry a small avatar
 
 // Reject query operators smuggled in request bodies ({ email: { $gt: '' } }):
 // filters built from user input are treated as literal values.
@@ -58,6 +58,7 @@ mongoose.connect(MONGODB_URI).catch((err) => {
 const userSchema = new mongoose.Schema({
   email: { type: String, unique: true },
   password: String,
+  studio: { type: Boolean, default: false }, // premium lease: public page + room look
   // Cove Rooms: invited hosts. Set with the admin action (or bootstrapped
   // from HOST_EMAILS). termsAcceptedAt is recorded when the host creates
   // their first room after ticking the conduct rule + terms.
@@ -142,7 +143,9 @@ const requireAuth = (req, res, next) => {
   } catch { res.status(401).json({ error: 'Unauthorized' }); }
 };
 const { attachRooms } = require('./rooms');
-attachRooms(app, io, { secret: SECRET, adminKey: process.env.ADMIN_KEY || '', requireAuth, User, WorkspaceDoc, authLimiter });
+const { makeTranslator } = require('./translate');
+const translator = makeTranslator(process.env);
+attachRooms(app, io, { secret: SECRET, adminKey: process.env.ADMIN_KEY || '', requireAuth, User, WorkspaceDoc, authLimiter, translate: translator });
 
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -157,8 +160,7 @@ io.use((socket, next) => {
 
 // ---- Room signaling (mesh, up to MAX_ROOM_SIZE people) ----
 const { attachSignaling } = require('./signaling');
-const { makeTranslator } = require('./translate');
-attachSignaling(io, { maxRoomSize: Number(process.env.MAX_ROOM_SIZE) || 10, translate: makeTranslator(process.env) });
+attachSignaling(io, { maxRoomSize: Number(process.env.MAX_ROOM_SIZE) || 10, translate: translator });
 
 // ---- Real-time collaboration (Yjs over WebSocket) ----
 // Socket.IO broadcasts are fine for WebRTC *signaling* (fire-and-forget

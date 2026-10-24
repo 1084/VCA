@@ -28,7 +28,8 @@ function attachSignaling(io, { maxRoomSize = 10, translate = null } = {}) {
       let hostPresent = false;
       for (const id of set || []) if (io.sockets.sockets.get(id)?.user?.email === named.ownerEmail) hostPresent = true;
       return { slug: named.slug, name: named.name, theme: named.theme, locked: !!named.locked, tipLink: named.tipLink || '',
-        payLink: named.payLink || '', payNote: named.payNote || '', translate: !!named.translate, hostName: (named.ownerEmail || '').split('@')[0], hostPresent };
+        payLink: named.payLink || '', payNote: named.payNote || '', translate: !!named.translate, hostName: (named.ownerEmail || '').split('@')[0], hostPresent,
+        studio: !!named.studio, wall: named.studio ? (named.wall || '') : '', welcome: named.studio ? (named.welcome || '') : '' };
     };
     const hostSockets = (named) => [...io.sockets.sockets.values()].filter((s) => s.user?.email === named.ownerEmail && s.data.roomId === named.slug);
 

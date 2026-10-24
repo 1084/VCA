@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import usePhone, { useKeyboardInset } from './usePhone';
 import useCaptions, { LANGS, speechSupported } from './useCaptions';
+import { WALL_CSS } from './lib';
 import { socket, initials, gradFor, STUN_ONLY, fetchIceServers } from './lib';
 import useMesh from './useMesh';
 import Notes, { useNotesDoc, appendLine, notesText } from './collab/Notes';
@@ -144,6 +145,9 @@ export default function CallScreen({ session, call, onLeave }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportText, setReportText] = useState('');
   const isHost = !!room && room.hostName === me && !session.guest;
+  const wall = room?.studio ? WALL_CSS[room.wall] || '' : '';
+  const welcomeText = room?.studio && room.welcome ? room.welcome.replace(/\{name\}/g, me) : '';
+
   // Language room: live captions
   const isLang = room?.theme === 'language';
   const [capOn, setCapOn] = useState(true);
@@ -581,7 +585,7 @@ export default function CallScreen({ session, call, onLeave }) {
   if (phone) {
     const recent = msgs.slice(-3);
     return (
-      <section className={`screen call phone ${isLang && !wsOn ? 'captioned' : ''}`} style={{ '--kb': `${kb}px` }}>
+      <section className={`screen call phone ${isLang && !wsOn ? 'captioned' : ''}`} style={{ '--kb': `${kb}px`, ...(wall ? { '--wall': wall } : {}) }}>
         <div className="call-top">
           <div className="room-chip">
             <span className="live">LIVE</span>
@@ -603,6 +607,9 @@ export default function CallScreen({ session, call, onLeave }) {
             <button className="ghost" onClick={shareNotes} aria-label="Share notes">{Icon.shareOut}</button>
             <button onClick={() => setWsOn(false)} aria-label="Close notes">Close</button>
           </div>
+        )}
+        {welcomeText && seconds < 45 && door === 'in' && (
+          <div className="welcome-card"><b>{room.hostName}</b> {welcomeText}</div>
         )}
         {handQueue.length > 0 && !wsOn && (
           <div className="ph-queue">✋ {handQueue.map(([, p]) => p.name).slice(0, 3).join(' → ')}{handQueue.length > 3 ? ` +${handQueue.length - 3}` : ''}</div>
@@ -751,7 +758,7 @@ export default function CallScreen({ session, call, onLeave }) {
   }
 
   return (
-    <section className="screen call">
+    <section className="screen call" style={wall ? { '--wall': wall } : undefined}>
       <div className="call-top">
         <div className="room-chip">
           <span className="live">LIVE</span>

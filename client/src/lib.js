@@ -62,3 +62,8 @@ export const saveRoom = (token, room) => api('rooms', { method: 'POST', token, b
 export const deleteRoom = (token, slug) => api(`rooms/${encodeURIComponent(slug)}`, { method: 'DELETE', token });
 export const roomSlugFromPath = () => { const m = location.pathname.match(/^\/r\/([a-z0-9-]{3,32})\/?$/i); return m ? m[1].toLowerCase() : null; };
 export const roomUrl = (slug) => `${location.origin}/r/${slug}`;
+export const aboutTranslated = (slug, to) => api(`r/${encodeURIComponent(slug)}/about?to=${encodeURIComponent(to)}`);
+export const WALLS = [['', 'Cove'], ['forest', 'Forest'], ['dusk', 'Dusk'], ['clay', 'Clay'], ['slate', 'Slate'], ['plum', 'Plum']];
+export const WALL_CSS = { '': '', forest: '#1A2E2A', dusk: '#2B2D44', clay: '#3A2A2A', slate: '#2A3240', plum: '#33223A' };
+export const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+export const SLOTS = ['morning', 'afternoon', 'evening'];
