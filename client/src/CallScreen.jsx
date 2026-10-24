@@ -460,13 +460,20 @@ export default function CallScreen({ session, call, onLeave }) {
   const removePeer = (id) => { if (window.confirm('Remove this person from the room?')) socket.emit('remove', { id }); };
   const sendReport = () => { if (reportText.trim()) socket.emit('report', { text: reportText.trim() }); };
   const tipLink = room?.tipLink || '';
-  const saveCaption = (c) => { appendLine(notes.doc, c.translated ? `${c.from}: ${c.text} — ${c.translated}` : `${c.from}: ${c.text}`); toast('Added to notes'); };
+  const [savedCaps, setSavedCaps] = useState(() => new Set());
+  const capKey = (c) => `${c.id}|${c.ts}`;
+  const saveCaption = (c) => {
+    if (savedCaps.has(capKey(c))) { toast('Already in notes'); return; }
+    appendLine(notes.doc, c.translated ? `${c.from}: ${c.text} — ${c.translated}` : `${c.from}: ${c.text}`);
+    setSavedCaps((prev) => new Set(prev).add(capKey(c)));
+    toast('Added to notes');
+  };
   const chatUnread = msgs.slice(chatSeen).filter((m) => m.id !== socket.id).length;
   const captionLane = isLang && (
     <div className="caps" ref={capsRef} aria-live="polite">
       {captions.slice(-6).map((c, i) => (
-        <div key={c.ts + i} className={`cap ${c.id === socket.id ? 'me' : ''}`} onClick={() => saveCaption(c)} title="Tap to add to notes">
-          <span className="who">{c.from}</span>
+        <div key={c.ts + i} className={`cap ${c.id === socket.id ? 'me' : ''} ${savedCaps.has(capKey(c)) ? 'saved' : ''}`} onClick={() => saveCaption(c)} title={savedCaps.has(capKey(c)) ? 'In notes' : 'Tap to add to notes'}>
+          <span className="who">{savedCaps.has(capKey(c)) ? '✓ ' : ''}{c.from}</span>
           <span className="txt">{c.text}</span>
           {c.translated && <span className="tr">{c.translated}</span>}
         </div>

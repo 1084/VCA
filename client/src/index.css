@@ -404,6 +404,8 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .cap .txt{overflow-wrap:anywhere}
 .cap .tr{grid-column:2;color:var(--muted);font-size:14px}
 .cap.interim{opacity:.6;cursor:default}
+.cap.saved{border-color:rgba(143,227,176,.45);cursor:default}
+.cap.saved .who{color:#8FE3B0}
 .cap.hint{color:var(--muted);font-size:13px;cursor:default;grid-template-columns:1fr}
 /* Language room on a phone: the video keeps the top of the screen and the
    captions get their own solid band beneath it, so text never sits on a face. */
