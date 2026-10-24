@@ -156,6 +156,10 @@ export default function CallScreen({ session, call, onLeave }) {
   const [interim, setInterim] = useState({});        // id -> live partial text
   const [langPick, setLangPick] = useState(false);
   const capsRef = useRef(null);
+  // phone, language room: the band under the video shows Captions or Chat
+  const [band, setBand] = useState('caps');
+  const [chatSeen, setChatSeen] = useState(0);
+  const chatRef = useRef(null);
   const sendCaption = useCallback((text, final) => socket.emit('caption', { text, lang: capLang, final }), [capLang]);
   const caps = useCaptions({ enabled: isLang && capOn, lang: capLang, micOn,
     onFinal: (t) => sendCaption(t, true), onInterim: (t) => sendCaption(t, false) });
@@ -166,6 +170,7 @@ export default function CallScreen({ session, call, onLeave }) {
   const [wsEverOn, setWsEverOn] = useState(false);
   const [msgs, setMsgs] = useState([]);
   const [draft, setDraft] = useState('');
+  useEffect(() => { if (band === 'chat') { setChatSeen(msgs.length); chatRef.current?.scrollTo?.({ top: 1e9, behavior: 'smooth' }); } }, [band, msgs]);
   const [seconds, setSeconds] = useState(0);
   const [toastMsg, setToastMsg] = useState('');
   const [floats, setFloats] = useState([]);
@@ -469,11 +474,29 @@ export default function CallScreen({ session, call, onLeave }) {
         <div key={id} className="cap interim"><span className="who">{v.from}</span><span className="txt">{v.text}…</span></div>
       ))}
       {phone && msgs.slice(-1).map((m, i) => (
-        <div key={'m' + i} className="cap chatcap"><span className="who">💬 {m.id === socket.id ? 'You' : m.from}</span><span className="txt">{m.text}</span></div>
+        <div key={'m' + i} className="cap chatcap" onClick={() => setBand('chat')} title="Open chat"><span className="who">💬 {m.id === socket.id ? 'You' : m.from}</span><span className="txt">{m.text}</span></div>
       ))}
       {captions.length === 0 && Object.keys(interim).length === 0 && (
         <div className="cap hint">{caps.supported ? (caps.listening ? 'Listening — captions appear here as people speak.' : capOn ? (micOn ? 'Starting captions…' : 'Unmute to caption your voice.') : 'Captions off.') : 'This browser can\'t transcribe; you\'ll still see others\' captions.'}{caps.error ? ` ${caps.error}` : ''}</div>
       )}
+    </div>
+  );
+  const chatUnread = msgs.slice(chatSeen).filter((m) => m.id !== socket.id).length;
+  const chatBand = (
+    <div className="caps chat-hist" ref={chatRef} aria-live="polite">
+      {msgs.length === 0 && <div className="cap hint">No messages yet. Everyone in the room sees what you send here.</div>}
+      {msgs.map((m, i) => (
+        <div key={`${m.ts || 0}-${i}`} className={`cap ${m.id === socket.id ? 'me' : ''} ${m.id === 'poll' ? 'pollmsg' : ''}`} style={{ cursor: 'default' }}>
+          <span className="who">{m.id === socket.id ? 'You' : m.from}</span>
+          <span className="txt">{m.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+  const bandTabs = (
+    <div className="band-tabs" role="tablist">
+      <button role="tab" aria-selected={band === 'caps'} className={band === 'caps' ? 'on' : ''} onClick={() => setBand('caps')}>Captions</button>
+      <button role="tab" aria-selected={band === 'chat'} className={band === 'chat' ? 'on' : ''} onClick={() => setBand('chat')}>Chat{chatUnread > 0 && <b>{chatUnread}</b>}</button>
     </div>
   );
   const langSheet = langPick && (
@@ -636,7 +659,8 @@ export default function CallScreen({ session, call, onLeave }) {
         </div>
 
         <div className="ph-bottom">
-          {!wsOn && captionLane}
+          {!wsOn && isLang && bandTabs}
+          {!wsOn && (isLang && band === 'chat' ? chatBand : captionLane)}
           {!wsOn && openPolls.slice(-1).map((p) => (
             <PollCard key={p.id} poll={p} mine={myVotes[p.id]} isAsker={p.by === socket.id} compact
               onVote={(i) => vote(p.id, i)} onClose={() => closePoll(p.id)} />
@@ -698,13 +722,6 @@ export default function CallScreen({ session, call, onLeave }) {
               ) : (
                 <>
                   <h3>More</h3>
-                  {isLang && !wsOn && (
-                    <div className="row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input placeholder="Message everyone…" value={draft} enterKeyHint="send" style={{ flex: 1, minWidth: 0, fontSize: 16, borderRadius: 22, padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--line)' }}
-                        onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { sendMsg(); setSheet(null); } }} />
-                      <button className="send" style={{ width: 40, height: 40, borderRadius: 20, background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { sendMsg(); setSheet(null); }} aria-label="Send">{Icon.send}</button>
-                    </div>
-                  )}
                   <button className="row" onClick={() => { setSheet(null); openWorkspace(); }}>
                     {Icon.notes}<span>{wsOn ? 'Hide notes' : 'Notes'}</span><small>Shared with the room, saved with the room code</small>
                   </button>
