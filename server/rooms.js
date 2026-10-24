@@ -221,7 +221,8 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
   const sweep = async () => {
     try {
       const cutoff = new Date(Date.now() - ROOM_IDLE_DAYS * 86400000);
-      const stale = await Room.find({ $or: [{ lastSessionAt: { $lt: cutoff } }, { lastSessionAt: null, createdAt: { $lt: cutoff } }] }).lean();
+      // sanitizeFilter is on globally (see index.js); these dates are ours, so mark the operators trusted
+      const stale = await Room.find(mongoose.trusted({ $or: [{ lastSessionAt: { $lt: cutoff } }, { lastSessionAt: null, createdAt: { $lt: cutoff } }] })).lean();
       for (const r of stale) {
         await Room.deleteOne({ slug: r.slug });
         await WorkspaceDoc.deleteOne({ name: `room-${r.slug}` }).catch(() => {});
@@ -229,7 +230,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
       }
       // notes for plain code rooms (not a named room) idle 30+ days
       const named = new Set((await Room.find({}, { slug: 1 }).lean()).map((r) => `room-${r.slug}`));
-      const old = await WorkspaceDoc.find({ updatedAt: { $lt: new Date(Date.now() - NOTES_IDLE_DAYS * 86400000) } }, { name: 1 }).lean();
+      const old = await WorkspaceDoc.find(mongoose.trusted({ updatedAt: { $lt: new Date(Date.now() - NOTES_IDLE_DAYS * 86400000) } }), { name: 1 }).lean();
       for (const d of old) if (!named.has(d.name)) await WorkspaceDoc.deleteOne({ _id: d._id });
     } catch (e) { console.warn('rooms sweep failed:', e.message); }
   };
