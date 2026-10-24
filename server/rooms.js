@@ -131,9 +131,10 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
       tipLink: cleanLink(req.body?.tipLink),
       payLink: cleanLink(req.body?.payLink),
       payNote: cleanText(req.body?.payNote, 80),
-      translate: theme === 'language' && req.body?.translate === true
+      translate: theme === 'language' && req.body?.translate === true,
+      studio: !!h.studio // the room's tier always follows the account's; saving re-syncs it
     };
-    // Studio fields (any host may edit; the page shows them only while studio is on)
+    // Studio fields (kept on the record; the door shows them only while studio is on)
     if (h.studio || existing?.studio) {
       Object.assign(doc, {
         tagline: cleanText(req.body?.tagline, 90), about: cleanText(req.body?.about, 1200), aboutLang: cleanText(req.body?.aboutLang, 8),
@@ -214,7 +215,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
       const rooms = await Room.find({ ownerEmail: email }).lean();
       for (const r of rooms) { await Room.deleteOne({ slug: r.slug }); await WorkspaceDoc.deleteOne({ name: `room-${r.slug}` }).catch(() => {}); }
     }
-    res.json({ ok: true, email, host, maxRooms: upd.maxRooms || u.maxRooms || 1 });
+    res.json({ ok: true, email, host, maxRooms: upd.maxRooms || u.maxRooms || 1, studio: typeof upd.studio === 'boolean' ? upd.studio : !!u.studio });
   });
 
   // ---- expiry sweep: nothing lingers that nobody uses ----
