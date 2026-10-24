@@ -464,6 +464,9 @@ export default function CallScreen({ session, call, onLeave }) {
       {Object.entries(interim).map(([id, v]) => (
         <div key={id} className="cap interim"><span className="who">{v.from}</span><span className="txt">{v.text}…</span></div>
       ))}
+      {phone && msgs.slice(-1).map((m, i) => (
+        <div key={'m' + i} className="cap chatcap"><span className="who">💬 {m.id === socket.id ? 'You' : m.from}</span><span className="txt">{m.text}</span></div>
+      ))}
       {captions.length === 0 && Object.keys(interim).length === 0 && (
         <div className="cap hint">{caps.supported ? (caps.listening ? 'Listening — captions appear here as people speak.' : capOn ? (micOn ? 'Starting captions…' : 'Unmute to caption your voice.') : 'Captions off.') : 'This browser can\'t transcribe; you\'ll still see others\' captions.'}{caps.error ? ` ${caps.error}` : ''}</div>
       )}
@@ -578,7 +581,7 @@ export default function CallScreen({ session, call, onLeave }) {
   if (phone) {
     const recent = msgs.slice(-3);
     return (
-      <section className="screen call phone" style={{ '--kb': `${kb}px` }}>
+      <section className={`screen call phone ${isLang && !wsOn ? 'captioned' : ''}`} style={{ '--kb': `${kb}px` }}>
         <div className="call-top">
           <div className="room-chip">
             <span className="live">LIVE</span>
@@ -688,6 +691,13 @@ export default function CallScreen({ session, call, onLeave }) {
               ) : (
                 <>
                   <h3>More</h3>
+                  {isLang && !wsOn && (
+                    <div className="row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input placeholder="Message everyone…" value={draft} enterKeyHint="send" style={{ flex: 1, minWidth: 0, fontSize: 16, borderRadius: 22, padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--line)' }}
+                        onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { sendMsg(); setSheet(null); } }} />
+                      <button className="send" style={{ width: 40, height: 40, borderRadius: 20, background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { sendMsg(); setSheet(null); }} aria-label="Send">{Icon.send}</button>
+                    </div>
+                  )}
                   <button className="row" onClick={() => { setSheet(null); openWorkspace(); }}>
                     {Icon.notes}<span>{wsOn ? 'Hide notes' : 'Notes'}</span><small>Shared with the room, saved with the room code</small>
                   </button>

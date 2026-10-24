@@ -405,9 +405,20 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .cap .tr{grid-column:2;color:var(--muted);font-size:14px}
 .cap.interim{opacity:.6;cursor:default}
 .cap.hint{color:var(--muted);font-size:13px;cursor:default;grid-template-columns:1fr}
-.call.phone .caps{max-height:34vh;padding:0 64px 8px 0;margin-bottom:6px;-webkit-mask-image:linear-gradient(transparent,#000 14%);mask-image:linear-gradient(transparent,#000 14%)}
-.call.phone .cap{background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-color:rgba(232,239,240,.14);font-size:15px}
-.call.phone .cap.me{background:rgba(255,180,84,.22)}
+/* Language room on a phone: the video keeps the top of the screen and the
+   captions get their own solid band beneath it, so text never sits on a face. */
+.call.phone.captioned .stage{bottom:calc(var(--kb,0px) + 250px + env(safe-area-inset-bottom))}
+.call.phone.captioned .ph-rail{top:auto;bottom:calc(var(--kb,0px) + 262px + env(safe-area-inset-bottom));transform:none;flex-direction:row;right:10px;gap:8px}
+.call.phone.captioned .ph-rail .ctl{width:40px;height:40px;min-width:40px}
+.call.phone.captioned .ph-bottom{background:var(--ink);border-top:1px solid var(--line);padding-top:6px}
+.call.phone .caps{height:168px;max-height:none;padding:0 0 4px;margin-bottom:6px;max-width:100%;justify-content:flex-end;-webkit-mask-image:linear-gradient(transparent,#000 10%);mask-image:linear-gradient(transparent,#000 10%)}
+.call.phone .cap{background:var(--surface);border-color:var(--line);font-size:15px;padding:5px 10px}
+.call.phone .cap.me{background:rgba(255,180,84,.16)}
+.call.phone .cap.hint{background:transparent;border:none;padding:4px 0}
+.cap.chatcap{border-style:dashed;opacity:.85}
+.cap.chatcap .who{color:var(--muted)}
+.call.phone.captioned .ph-chat,.call.phone.captioned .ph-input{display:none}
+.call.phone.captioned .ph-primary{margin-top:4px}
 
 /* Safari autoplay-recovery prompt */
 .unblock{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);z-index:95;padding:12px 20px;border-radius:12px;background:var(--amber);color:#20160A;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.45)}
