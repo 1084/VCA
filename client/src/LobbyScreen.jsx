@@ -10,6 +10,16 @@ export default function LobbyScreen({ session, email, onJoin, onSignOut }) {
   const [err, setErr] = useState('');
   const [joining, setJoining] = useState(false);
   const [devices, setDevices] = useState({ cams: [], mics: [] });
+  // tap the avatar → a small menu (who you are, Sign out); closes on outside tap or Escape
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e) => { if (!menuRef.current?.contains(e.target)) setMenu(false); };
+    const key = (e) => { if (e.key === 'Escape') setMenu(false); };
+    document.addEventListener('pointerdown', close); document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', key); };
+  }, [menu]);
   const [camId, setCamId] = useState('');
   const [micId, setMicId] = useState('');
   const previewRef = useRef(null);
@@ -107,12 +117,17 @@ export default function LobbyScreen({ session, email, onJoin, onSignOut }) {
     <section className="screen lobby">
       <div className="lobby-head">
         <div className="mark"><span className="dot" />Cove</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span className="lobby-email" style={{ color: 'var(--muted)', fontSize: 13 }}>{email}</span>
-          <div className="avatar-sm" style={{ background: `linear-gradient(135deg,${grad[0]},${grad[1]})` }}>
+        <div className="me-menu" ref={menuRef}>
+          <button className="avatar-sm" style={{ background: `linear-gradient(135deg,${grad[0]},${grad[1]})` }}
+            onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu} aria-label="Account menu" title={email}>
             {initials(name)}
-          </div>
-          {onSignOut && <button className="signout" onClick={onSignOut} title="Sign out of Cove on this device">Sign out</button>}
+          </button>
+          {menu && (
+            <div className="menu" role="menu">
+              <div className="who"><b>{name}</b><span>{email}</span></div>
+              {onSignOut && <button role="menuitem" className="item" onClick={() => { setMenu(false); onSignOut(); }}>Sign out</button>}
+            </div>
+          )}
         </div>
       </div>
       <div className="lobby-grid">
