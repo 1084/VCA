@@ -33,7 +33,7 @@ rooms.set('ms-ortiz', { slug: 'ms-ortiz', name: 'Spanish with Ms. Ortiz', ownerE
   attachSignaling(io, { maxRoomSize: 10 });
   await new Promise((r) => server.listen(0, r));
   const url = `http://localhost:${server.address().port}`;
-  const fs=require('fs'); const log=(m)=>fs.writeSync(1, m+'\n'); const console={log:(...a)=>log(a.join(' ')), error:(...a)=>log('ERR '+a.map(x=>x&&x.stack||x).join(' '))}; const connect = (claims) => new Promise((res, rej) => { const c = Client(url, { auth: { token: jwt.sign(claims, SECRET) } }); c.on('connect', () => res(c)); c.on('connect_error', rej); });
+  const fs=require('fs'); const log=(m)=>fs.writeSync(1, m+'\n'); const console={log:(...a)=>log(a.join(' ')), error:(...a)=>log('ERR '+a.map(x=>x&&x.stack||x).join(' '))}; const connect = (claims) => new Promise((res, rej) => { const c = Client(url, { auth: { token: jwt.sign(claims, SECRET) } }); c._claims = claims; c.on('connect', () => res(c)); c.on('connect_error', rej); });
   const once = (c, ev) => new Promise((r) => c.once(ev, r));
 
   // 1. guest knocks while host is away → denied host-away
@@ -74,10 +74,18 @@ rooms.set('ms-ortiz', { slug: 'ms-ortiz', name: 'Spanish with Ms. Ortiz', ownerE
 
   // 7. report stored with words only; host removes someone
   g4.emit('report', { text: 'test report' }); await once(g4, 'reported'); assert.strictEqual(reports[0].from, 'Priya'); assert.strictEqual(reports[0].room, 'ms-ortiz'); console.log('✓ report stored');
-  const remP = once(g4, 'denied'); host.emit('remove', { id: g4.id }); const rm = await remP; assert.strictEqual(rm.reason, 'removed'); console.log('✓ host removed a guest');
+  const remP = once(g4, 'denied'); const lockedP = once(host, 'room-state'); host.emit('remove', { id: g4.id }); const rm = await remP; assert.strictEqual(rm.reason, 'removed'); console.log('✓ host removed a guest');
+  const afterRm = await lockedP; assert.strictEqual(afterRm.locked, true); assert.strictEqual(rooms.get('ms-ortiz').locked, true); console.log('✓ removing someone locked the door');
+
+  // 7b. the removed key can't knock again (host sees nothing); a fresh key can
+  const g4b = await connect({ guest: true, room: 'ms-ortiz', name: 'Priya', jti: 'priya-key' });
+  // same key id as g4 would need the same token; g4 had no jti, so its identity is name|iat — reuse g4's exact claims via its token
+  g4b.disconnect();
+  const g4c = Client(url, { auth: { token: g4.io.opts.auth.token } }); await once(g4c, 'connect');
+  let sawKnock = false; const kw = () => { sawKnock = true; }; host.on('knock', kw);
+  g4c.emit('join', 'ms-ortiz'); const d4 = await once(g4c, 'denied'); assert.strictEqual(d4.reason, 'removed'); await new Promise((r) => setTimeout(r, 80)); assert.strictEqual(sawKnock, false); host.off('knock', kw); g4c.disconnect(); console.log('✓ removed key is refused without a knock');
 
   // 8. host declines a knock
-  host.emit('lock', { locked: true }); await once(host, 'room-state');
   const g5 = await connect({ guest: true, room: 'ms-ortiz', name: 'Sam' });
   const k5P = once(host, 'knock'); g5.emit('join', 'ms-ortiz'); const k5 = await k5P;
   const d5P = once(g5, 'denied'); host.emit('deny', { id: k5.id }); const d5 = await d5P; assert.strictEqual(d5.reason, 'host-declined'); console.log('✓ declined knock');

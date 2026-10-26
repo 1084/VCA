@@ -17,7 +17,7 @@ if (q.get('cam') === '1') {
   draw(); stream = c.captureStream(24);
 }
 const root = ReactDOM.createRoot(document.getElementById('root'));
-if (q.get('lobby') === '1') root.render(<LobbyScreen session={{ token: 't', email: 'testuser@example.com' }} email="testuser@example.com" onJoin={() => alert('join')} />);
+if (q.get('lobby') === '1') root.render(<LobbyScreen session={{ token: 't', email: 'testuser@example.com' }} email="testuser@example.com" onJoin={() => alert('join')} onSignOut={() => alert('sign out')} />);
 else if (q.get('door') === '1') root.render(<RoomEntry slug="ms-ortiz" session={null} onEnter={() => alert('enter')} />);
 else root.render(
   <CallScreen session={{ token: 't', email: 'testuser@example.com' }}

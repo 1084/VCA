@@ -13,6 +13,7 @@
 //   the time. Never media. Read with the admin key.
 
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
 const SLUG_RX = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
@@ -177,7 +178,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
     if (!room || !roomIsOpen(room)) return res.status(404).json({ error: 'No room at this link.' });
     const name = cleanText(req.body?.name, 32).replace(/[@<>]/g, '');
     if (name.length < 1) return res.status(400).json({ error: 'Tell the room your name.' });
-    const token = jwt.sign({ guest: true, room: room.slug, name }, secret, { expiresIn: GUEST_TTL });
+    const token = jwt.sign({ guest: true, room: room.slug, name, jti: crypto.randomUUID() }, secret, { expiresIn: GUEST_TTL });
     res.json({ token, name, room: publicRoom(room) });
   });
 

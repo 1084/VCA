@@ -15,7 +15,7 @@ export default function App() {
     return <RoomEntry slug={slug} session={session} onEnter={(s, c) => { setSession(s); setCall(c); }} />;
   }
   if (!session) return <AuthScreen onAuthed={setSession} />;
-  if (!call) return <LobbyScreen session={session} email={session.email} onJoin={setCall} />;
+  if (!call) return <LobbyScreen session={session} email={session.email} onJoin={setCall} onSignOut={() => { setSession(null); history.replaceState(null, '', '/'); }} />;
   return (
     <CallScreen
       key={call.roomId}

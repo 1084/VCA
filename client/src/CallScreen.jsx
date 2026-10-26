@@ -457,7 +457,7 @@ export default function CallScreen({ session, call, onLeave }) {
   const admit = (id) => { socket.emit('admit', { id }); setKnocks((k) => k.filter((x) => x.id !== id)); };
   const deny = (id) => { socket.emit('deny', { id }); setKnocks((k) => k.filter((x) => x.id !== id)); };
   const setLock = (locked) => socket.emit('lock', { locked });
-  const removePeer = (id) => { if (window.confirm('Remove this person from the room?')) socket.emit('remove', { id }); };
+  const removePeer = (id) => { if (window.confirm('Remove this person? They can\'t come back in during this session, and the door will be locked.')) socket.emit('remove', { id }); };
   const sendReport = () => { if (reportText.trim()) socket.emit('report', { text: reportText.trim() }); };
   const tipLink = room?.tipLink || '';
   const [savedCaps, setSavedCaps] = useState(() => new Set());
@@ -570,7 +570,7 @@ export default function CallScreen({ session, call, onLeave }) {
         ) : (
           <>
             <h3>{deniedWhy === 'host-away' ? `${room?.hostName || 'The host'} isn't in yet` : deniedWhy === 'host-declined' ? 'Not this time' : deniedWhy === 'removed' ? 'You were removed from the room' : deniedWhy === 'closed' ? 'This room is closed' : 'No way in'}</h3>
-            <p>{deniedWhy === 'host-away' ? 'The door only opens while the host is in the room. Go back to the door and try again in a bit.' : deniedWhy === 'host-declined' ? 'The host didn\'t let you in. If you were expected, check the link with them.' : ''}</p>
+            <p>{deniedWhy === 'host-away' ? 'The door only opens while the host is in the room. Go back to the door and try again in a bit.' : deniedWhy === 'host-declined' ? 'The host didn\'t let you in. If you were expected, check the link with them.' : deniedWhy === 'removed' ? 'The host asked you to leave, and the door is closed to you for the rest of their session.' : ''}</p>
           </>
         )}
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { initials, gradFor, newRoomCode, ROOM_CODE_PATTERN } from './lib';
 import MyRoom from './MyRoom';
 
-export default function LobbyScreen({ session, email, onJoin }) {
+export default function LobbyScreen({ session, email, onJoin, onSignOut }) {
   const name = email.split('@')[0];
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(false);
@@ -108,10 +108,11 @@ export default function LobbyScreen({ session, email, onJoin }) {
       <div className="lobby-head">
         <div className="mark"><span className="dot" />Cove</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ color: 'var(--muted)', fontSize: 13 }}>{email}</span>
+          <span className="lobby-email" style={{ color: 'var(--muted)', fontSize: 13 }}>{email}</span>
           <div className="avatar-sm" style={{ background: `linear-gradient(135deg,${grad[0]},${grad[1]})` }}>
             {initials(name)}
           </div>
+          {onSignOut && <button className="signout" onClick={onSignOut} title="Sign out of Cove on this device">Sign out</button>}
         </div>
       </div>
       <div className="lobby-grid">
