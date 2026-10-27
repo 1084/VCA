@@ -13,17 +13,39 @@ export default function MyRoom({ session, onOpen }) {
   const [copied, setCopied] = useState('');
   const [agree, setAgree] = useState(false);
   const [tab, setTab] = useState('room'); // 'room' | 'studio'
+  // Photo: the host frames the crop (drag to move, slider to zoom) before it's
+  // shrunk to a 192px JPEG. The default frame favours the top of a portrait,
+  // where faces are, rather than the dead centre.
+  const [crop, setCrop] = useState(null); // { img, url, zoom, x, y } while framing
   const pickPhoto = (file) => {
     if (!file) return;
     const img = new Image(); const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const c = document.createElement('canvas'); const S = 192; c.width = S; c.height = S;
-      const side = Math.min(img.width, img.height);
-      c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
-      set('photo', c.toDataURL('image/jpeg', 0.82)); URL.revokeObjectURL(url);
-    };
+    img.onload = () => { const portrait = img.height > img.width; setCrop({ img, url, zoom: 1, x: 0.5, y: portrait ? 0.3 : 0.5 }); };
     img.src = url;
   };
+  const cropBox = (c) => { // source square for the current frame
+    const side = Math.min(c.img.width, c.img.height) / c.zoom;
+    const sx = Math.min(Math.max(c.x * c.img.width - side / 2, 0), c.img.width - side);
+    const sy = Math.min(Math.max(c.y * c.img.height - side / 2, 0), c.img.height - side);
+    return { sx, sy, side };
+  };
+  const applyCrop = () => {
+    const c = crop; const { sx, sy, side } = cropBox(c);
+    const cv = document.createElement('canvas'); const S = 192; cv.width = S; cv.height = S;
+    cv.getContext('2d').drawImage(c.img, sx, sy, side, side, 0, 0, S, S);
+    set('photo', cv.toDataURL('image/jpeg', 0.82)); URL.revokeObjectURL(c.url); setCrop(null);
+  };
+  const dragRef = { on: false, px: 0, py: 0 };
+  const cropDrag = (e) => {
+    if (e.type === 'pointerdown') { dragRef.on = true; dragRef.px = e.clientX; dragRef.py = e.clientY; e.currentTarget.setPointerCapture(e.pointerId); return; }
+    if (e.type === 'pointerup' || e.type === 'pointercancel') { dragRef.on = false; return; }
+    if (!dragRef.on) return;
+    const box = e.currentTarget.getBoundingClientRect(); const { side } = cropBox(crop);
+    const dx = (e.clientX - dragRef.px) / box.width * side / crop.img.width, dy = (e.clientY - dragRef.py) / box.height * side / crop.img.height;
+    dragRef.px = e.clientX; dragRef.py = e.clientY;
+    setCrop((c) => ({ ...c, x: Math.min(1, Math.max(0, c.x - dx)), y: Math.min(1, Math.max(0, c.y - dy)) }));
+  };
+  const cropStyle = () => { const { sx, sy, side } = cropBox(crop); const k = 240 / side; return { width: crop.img.width * k, height: crop.img.height * k, marginLeft: -sx * k, marginTop: -sy * k }; };
 
   const load = () => whoAmI(session.token).then(setMe).catch(() => setMe({ host: false, rooms: [] }));
   useEffect(() => { load(); }, [session.token]);
@@ -79,7 +101,24 @@ export default function MyRoom({ session, onOpen }) {
                   {edit.photo ? <img src={edit.photo} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} /> : <div className="avatar-sm" style={{ background: 'var(--surface-2)' }} />}
                   <label className="wb-btn" style={{ cursor: 'pointer' }}>Choose<input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => pickPhoto(e.target.files?.[0])} /></label>
                   {edit.photo && <button className="wb-btn" onClick={() => set('photo', '')}>Remove</button>}
-                </div></div>
+                </div>
+                {crop && (
+                  <div className="cropper">
+                    <div className="frame" onPointerDown={cropDrag} onPointerMove={cropDrag} onPointerUp={cropDrag} onPointerCancel={cropDrag}>
+                      <img src={crop.url} alt="" draggable={false} style={cropStyle()} />
+                      <div className="ring" />
+                    </div>
+                    <div className="tools">
+                      <input type="range" min={1} max={3} step={0.01} value={crop.zoom} onChange={(e) => setCrop((c) => ({ ...c, zoom: +e.target.value }))} aria-label="Zoom" />
+                      <small>Drag to move · slide to zoom</small>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="wb-btn" onClick={() => { URL.revokeObjectURL(crop.url); setCrop(null); }}>Cancel</button>
+                        <button className="btn btn-primary" style={{ padding: '7px 14px', width: 'auto', fontSize: 13 }} onClick={applyCrop}>Use this</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="field"><label>Tagline — under the room name</label><input value={edit.tagline || ''} maxLength={90} placeholder="Alicia Ortiz · Cuernavaca, México · Spanish, chemistry" onChange={(e) => set('tagline', e.target.value)} /></div>
               <div className="field"><label>About, in your language (guests can translate it)</label>
                 <textarea value={edit.about || ''} maxLength={1200} placeholder="Who you are, how you teach, who your lessons are for." onChange={(e) => set('about', e.target.value)} />

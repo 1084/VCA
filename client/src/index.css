@@ -110,6 +110,14 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .panel-head h3{font-family:var(--font-display);font-weight:600;font-size:16px;flex:1}
 .panel-head button{color:var(--muted);font-size:18px;line-height:1}
 .panel-body{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.cropper{margin-top:10px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.cropper .frame{width:240px;height:240px;overflow:hidden;position:relative;border-radius:12px;background:#000;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.cropper .frame:active{cursor:grabbing}
+.cropper .frame img{display:block;max-width:none;pointer-events:none}
+.cropper .ring{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 999px rgba(12,21,24,.62);pointer-events:none}
+.cropper .tools{display:flex;flex-direction:column;gap:8px;min-width:180px}
+.cropper .tools input[type=range]{width:100%;accent-color:var(--amber)}
+.cropper .tools small{color:var(--muted);font-size:12.5px}
 .me-menu{position:relative}
 .me-menu .avatar-sm{cursor:pointer;transition:box-shadow .15s}
 .me-menu .avatar-sm:hover,.me-menu .avatar-sm[aria-expanded="true"]{box-shadow:0 0 0 3px rgba(255,180,84,.35)}
