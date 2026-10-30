@@ -45,6 +45,10 @@ const io = new Server(server, {
 });
 
 app.use(cors({ origin: CLIENT_ORIGIN }));
+// Stripe's webhook must see the raw body to check the signature; mounted before the JSON parser.
+const { attachBilling, makeStripe } = require('./billing');
+let billingWebhook = (req, res) => res.status(503).end();
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), (req, res) => billingWebhook(req, res));
 app.use(express.json({ limit: '256kb' })); // room records carry a small avatar
 
 // Reject query operators smuggled in request bodies ({ email: { $gt: '' } }):
@@ -145,7 +149,18 @@ const requireAuth = (req, res, next) => {
 const { attachRooms } = require('./rooms');
 const { makeTranslator } = require('./translate');
 const translator = makeTranslator(process.env);
-attachRooms(app, io, { secret: SECRET, adminKey: process.env.ADMIN_KEY || '', requireAuth, User, WorkspaceDoc, authLimiter, translate: translator });
+const { attachWalls } = require('./walls');
+const { Room: RoomModel } = require('./rooms');
+const walls = attachWalls(app, io, { secret: SECRET, Room: RoomModel, authLimiter });
+attachRooms(app, io, { secret: SECRET, adminKey: process.env.ADMIN_KEY || '', requireAuth, User, WorkspaceDoc, authLimiter, translate: translator, onRoomDeleted: walls.clearWall });
+const billing = attachBilling(app, {
+  stripe: makeStripe(process.env), requireAuth, Room: RoomModel, User,
+  webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+  prices: { month: process.env.STRIPE_PRICE_MONTH || '', day: process.env.STRIPE_PRICE_DAY || '' },
+  origin: CLIENT_ORIGIN[0] || 'http://localhost:5173'
+});
+billingWebhook = billing.webhook;
+console.log(`billing: ${billing.ready ? 'ready' : 'not configured (STRIPE_SECRET_KEY / STRIPE_PRICE_MONTH / STRIPE_PRICE_DAY)'}`);
 
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;

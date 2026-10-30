@@ -44,11 +44,14 @@ const roomSchema = new mongoose.Schema({
   avail: { type: [Number], default: [] },      // 21 flags: day*3 + slot (morning/afternoon/evening)
   tz: { type: String, default: '' },
   photo: { type: String, default: '' },        // data: URL, ≤ 120 KB (small avatar)
-  paidThrough: { type: Date, default: null },  // null = comped (invited host)
+  paidThrough: { type: Date, default: null },  // null = comped (invited host); otherwise the door closes after this
+  plan: { type: String, default: '' },         // 'month' | 'day' — last thing bought (billing.js)
+  stripeCustomerId: { type: String, default: '' },
+  stripeSubscriptionId: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },
   lastSessionAt: { type: Date, default: Date.now } // the host was last in the room; drives expiry
 });
-const TERMS_VERSION = '2026-10-20';
+const TERMS_VERSION = '2026-10-30';
 const ROOM_IDLE_DAYS = 90;   // named room with no host session for this long is archived
 const NOTES_IDLE_DAYS = 30;  // plain-code room notes untouched for this long are deleted
 const Room = mongoose.model('Room', roomSchema);
@@ -91,7 +94,7 @@ function roomIsOpen(room) {
   return !room.paidThrough || room.paidThrough.getTime() > Date.now();
 }
 
-function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDoc, authLimiter, translate = null }) {
+function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDoc, authLimiter, translate = null, onRoomDeleted = async () => {} }) {
   const admin = (req, res, next) => {
     if (!adminKey) return res.status(503).json({ error: 'ADMIN_KEY not configured' });
     if (req.get('authorization') !== `Bearer ${adminKey}`) return res.status(401).json({ error: 'Unauthorized' });
@@ -151,7 +154,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
 
   app.delete('/api/rooms/:slug', requireAuth, async (req, res) => {
     const r = await Room.deleteOne({ slug: req.params.slug, ownerEmail: req.user.email });
-    if (r.deletedCount === 1) await WorkspaceDoc.deleteOne({ name: `room-${req.params.slug}` }).catch(() => {});
+    if (r.deletedCount === 1) { await WorkspaceDoc.deleteOne({ name: `room-${req.params.slug}` }).catch(() => {}); await onRoomDeleted(req.params.slug).catch(() => {}); }
     res.json({ ok: r.deletedCount === 1 });
   });
 
@@ -196,6 +199,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
   app.delete('/api/admin/rooms/:slug', admin, async (req, res) => {
     const r = await Room.deleteOne({ slug: req.params.slug });
     await WorkspaceDoc.deleteOne({ name: `room-${req.params.slug}` }).catch(() => {});
+    await onRoomDeleted(req.params.slug).catch(() => {});
     res.json({ ok: r.deletedCount === 1 });
   });
   // invite or revoke a host: { email, host: true|false, maxRooms? }

@@ -8,3 +8,8 @@ dist/
 
 # OS noise
 .DS_Store
+
+# Local scratch: screenshots and probe scripts
+shots/
+client/shots/
+/*.mjs
