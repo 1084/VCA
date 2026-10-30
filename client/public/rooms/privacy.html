@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy policy · Cove Rooms</title>
+<meta name="description" content="What Cove Rooms stores, what it never sees, and who else touches your data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Inter:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0C1518;--surface:#132026;--surface-2:#1A2A31;--line:rgba(232,239,240,.09);--text:#E8EFF0;--muted:#8CA1A7;--amber:#FFB454;--cyan:#7CCFDE;--display:"Bricolage Grotesque",sans-serif;--body:"Inter",sans-serif;--mono:"Spline Sans Mono",monospace}
+*{box-sizing:border-box;margin:0}
+body{background:var(--ink);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan)}
+.wrap{width:min(760px,100% - 40px);margin:0 auto;padding-bottom:60px}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 0 34px}
+.mark{display:inline-flex;align-items:center;gap:9px;font-family:var(--display);font-weight:700;font-size:19px;color:var(--text);text-decoration:none}
+.mark .dot{width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:0 0 12px rgba(255,180,84,.7)}
+.mark small{font-weight:400;color:var(--muted);font-size:14px}
+nav a{color:var(--muted);text-decoration:none;font-size:14px;margin-left:18px}nav a:hover,nav a.on{color:var(--text)}
+h1{font-family:var(--display);font-weight:600;font-size:clamp(30px,5vw,42px);letter-spacing:-.02em;line-height:1.1}
+.meta{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin:12px 0 26px}
+.lede{color:var(--muted);font-size:17.5px;margin-bottom:30px}
+h2{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.01em;margin:38px 0 10px}
+h3{font-family:var(--display);font-weight:600;font-size:17px;margin:22px 0 6px}
+p,li{margin-bottom:12px}ul,ol{padding-left:22px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 20px;margin:18px 0}
+.box b{color:var(--amber)}
+table{width:100%;border-collapse:collapse;font-size:14.5px;margin:14px 0}td,th{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:500}
+footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;font-size:13px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+footer a{color:var(--muted)}
+@media (max-width:640px){nav a{margin-left:12px}}
+</style></head><body><div class="wrap">
+<header><a class="mark" href="/rooms/"><span class="dot"></span>Cove <small>Rooms</small></a>
+<nav><a href="/rooms/terms.html">Terms</a><a href="/rooms/conduct.html">Conduct</a><a href="/rooms/privacy.html" class="on">Privacy</a></nav></header>
+
+<h1>Privacy policy</h1>
+<p class="meta">Version 2026-10-30 · Effective November 1, 2026</p>
+<p class="lede">Cove is built so that we see as little as possible. This page lists exactly what we store, for how long, and which other companies touch it. If a sentence here ever stops being true, we change the product or we change the sentence.</p>
+
+<h2>What we never see</h2>
+<p>Video and audio travel directly between the people in a room, encrypted end to end. There is no platform recording and no server in the middle that can watch or listen. When a direct path fails (about one call in six, behind strict networks), the encrypted stream is relayed through a Cloudflare TURN server that forwards the bytes without being able to read them.</p>
+<p>We do not read chat, and chat is not stored: it exists in the browsers of the people in the room and vanishes when they leave.</p>
+
+<h2>Guests: nothing</h2>
+<p>Guests have no account. To enter a room a guest types a name; that name is held in the browser for the session and shown to others in the room. We do not store it. We keep no record of a guest beyond the join and leave times described below, which carry no name and no address.</p>
+
+<h2>What we store, and for how long</h2>
+<table>
+<tr><th>Data</th><th>Why</th><th>How long</th></tr>
+<tr><td>Host email and a hashed password</td><td>Sign-in</td><td>Until the host closes their account</td></tr>
+<tr><td>Room name, link, settings, and for Studio rooms the host's own page text and photo</td><td>Running the room</td><td>Until the room is deleted</td></tr>
+<tr><td>Whether rent is paid and through what date; Stripe customer and subscription ids</td><td>Opening and closing the door</td><td>Until the room is deleted, then 7 years in accounting records as the law requires</td></tr>
+<tr><td>Shared notes</td><td>They are the room's notes</td><td>Until cleared by the room; 30 days after the room closes</td></tr>
+<tr><td>Wall pins: titles, text, due dates, and the files behind them</td><td>What the room remembers between lessons</td><td>Until taken down; deleted with the room</td></tr>
+<tr><td>Who hosted a room and when participants joined and left (no names)</td><td>Safety: answering a report</td><td>30 days</td></tr>
+<tr><td>Reports: the room, the time, the reporter's display name and words</td><td>Safety</td><td>1 year</td></tr>
+<tr><td>Removed-guest markers (a random key, not a name)</td><td>Keeping a removed guest out</td><td>Until the host leaves the room</td></tr>
+</table>
+<p>That is the whole list. We keep no analytics, no advertising identifiers, no tracking pixels, and no copy of anything said or shown in a room.</p>
+
+<h2>Captions and translation</h2>
+<p>Live captions use the speech recognition built into your browser. On many devices that recognition runs on the device; on some, the browser's maker (Apple or Google) processes the audio under their own policies. Cove's servers never receive audio. In Language rooms, the <em>text</em> of a caption is sent to DeepL for translation when the host has turned translation on; no name or identifier goes with it, and nothing is kept.</p>
+
+<h2>Walls and files</h2>
+<p>Files pinned to a Studio wall are uploaded straight from the browser to storage we rent from Cloudflare (R2), in a private bucket. They are reached only through links that expire after ten minutes and are issued only to people holding a key to that room. Hand-ins are visible to the host and to the student who sent them, and to no one else. Taking a pin down deletes the file.</p>
+
+<h2>Payments</h2>
+<p>Rent is paid on Stripe's pages. Stripe receives your card details and billing address and is the controller of that data under its own privacy policy. We receive confirmation of payment and the ids needed to match it to your room. We never see a card number.</p>
+
+<h2>Who else touches the data</h2>
+<table>
+<tr><th>Company</th><th>What they do for us</th><th>What they can see</th></tr>
+<tr><td>Render (US)</td><td>Runs our server</td><td>Everything in the table above, in transit and in memory</td></tr>
+<tr><td>MongoDB Atlas (US)</td><td>Our database</td><td>The stored data listed above</td></tr>
+<tr><td>Cloudflare</td><td>Serves the app, relays calls that cannot connect directly, stores wall files</td><td>Encrypted media it cannot read; wall files</td></tr>
+<tr><td>Stripe</td><td>Payments</td><td>Payment details; your email</td></tr>
+<tr><td>DeepL</td><td>Caption translation, Language rooms only</td><td>Caption text, with no identity attached</td></tr>
+</table>
+<p>No one else. We do not sell, rent, or share data with advertisers or data brokers, and we never will.</p>
+
+<h2>Children</h2>
+<p>Guests have no accounts and we collect nothing from them, which is how we approach children's privacy: there is nothing to collect. Hosts who teach children are responsible for having the parent's knowledge and any permission their situation requires, as set out in the <a href="/rooms/conduct.html">conduct rule</a>. Parents who want to know what a room holds about their child may write to us; the answer will almost always be "nothing", and we will show you how we know.</p>
+
+<h2>Your rights</h2>
+<p>Write to <a href="mailto:support@johnhubert.llc">support@johnhubert.llc</a> to see, export, correct or delete anything we hold about you. Hosts can export notes and delete their room themselves at any time. We answer within a week and complete deletions within thirty days, except for the payment records the law requires us to keep. You may complain to your data protection authority; we would rather you wrote to us first.</p>
+
+<h2>Security</h2>
+<p>Connections use TLS. Passwords are hashed. Keys to rooms are short-lived and scoped to one room. Admin access requires a key held by one person. If we ever discover a breach that affects you, we will tell you within 72 hours of knowing, in plain words.</p>
+
+<h2>Changes</h2>
+<p>We post changes here with a new version date and email hosts about anything material at least fourteen days before it takes effect.</p>
+
+<h2>Contact</h2>
+<p>John Hubert LLC · Virginia, USA · <a href="mailto:support@johnhubert.llc">support@johnhubert.llc</a></p>
+
+<footer><span>© 2026 John Hubert LLC · Virginia · <a href="https://johnhubert.llc/">johnhubert.llc</a></span><span><a href="mailto:support@johnhubert.llc">support@johnhubert.llc</a></span></footer>
+</div></body></html>

@@ -63,6 +63,7 @@ export default function AuthScreen({ onAuthed }) {
           <button className="btn btn-primary" disabled={busy} type="submit">
             {busy ? 'One sec…' : signup ? 'Create account' : 'Sign in'}
           </button>
+          {signup && <p className="hint" style={{ marginTop: 12, fontSize: 12.5 }}>By creating an account you agree to the <a href="/rooms/terms.html" target="_blank" rel="noopener">terms</a> and the <a href="/rooms/privacy.html" target="_blank" rel="noopener">privacy policy</a>.</p>}
           <p className="switch-auth">
             {signup ? 'Already have an account? ' : 'New to Cove? '}
             <button type="button" onClick={() => { setSignup(!signup); setErr(''); }}>

@@ -104,6 +104,7 @@ export default function RoomEntry({ slug, onEnter, session }) {
             </button>
             <p className="hint" style={{ marginTop: 14, fontSize: 12.5 }}>
               No download, no account. Your microphone will be asked for; the camera stays off until you turn it on inside.
+              By entering you agree to the <a href="/rooms/conduct.html" target="_blank" rel="noopener">conduct rule</a>.
             </p>
           </>
         )}
