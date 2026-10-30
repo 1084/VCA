@@ -5,6 +5,7 @@ import { WALL_CSS } from './lib';
 import { socket, initials, gradFor, STUN_ONLY, fetchIceServers } from './lib';
 import useMesh from './useMesh';
 import Notes, { useNotesDoc, appendLine, notesText } from './collab/Notes';
+import Wall from './Wall';
 
 const Icon = {
   mic: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>,
@@ -128,10 +129,10 @@ export default function CallScreen({ session, call, onLeave }) {
   const [sharing, setSharing] = useState(false);
   const [shareStream, setShareStream] = useState(null);
   const [hand, setHand] = useState(false);
-  const [panel, setPanel] = useState(null); // 'chat' | 'people' | null (desktop side panels)
+  const [panel, setPanel] = useState(null); // 'chat' | 'people' | 'wall' | null (desktop side panels)
   const phone = usePhone();          // narrow or short viewport → theater layout
   const kb = useKeyboardInset();     // on-screen keyboard height (0 on desktop)
-  const [sheet, setSheet] = useState(null); // phone: 'more' | 'people' | 'ask' | null
+  const [sheet, setSheet] = useState(null); // phone: 'more' | 'people' | 'ask' | 'wall' | null
   const [askOpen, setAskOpen] = useState(false); // desktop poll composer
   const [polls, setPolls] = useState({});    // id -> tally from the server
   const [myVotes, setMyVotes] = useState({}); // pollId -> option index
@@ -147,6 +148,15 @@ export default function CallScreen({ session, call, onLeave }) {
   const isHost = !!room && room.hostName === me && !session.guest;
   const wall = room?.studio ? WALL_CSS[room.wall] || '' : '';
   const welcomeText = room?.studio && room.welcome ? room.welcome.replace(/\{name\}/g, me) : '';
+  const hasWall = !!room?.studio && door === 'in';
+  const wallOpen = panel === 'wall' || sheet === 'wall';
+  const wallOpenRef = useRef(false); wallOpenRef.current = wallOpen;
+  const [wallNew, setWallNew] = useState(false);   // something changed on the wall while it was closed
+  useEffect(() => {
+    const onWall = () => { if (!wallOpenRef.current) setWallNew(true); };
+    socket.on('wall-changed', onWall); return () => socket.off('wall-changed', onWall);
+  }, []);
+  useEffect(() => { if (wallOpen) setWallNew(false); }, [wallOpen]);
 
   // Language room: live captions
   const isLang = room?.theme === 'language';
@@ -660,6 +670,11 @@ export default function CallScreen({ session, call, onLeave }) {
           <button className={`ctl ${openPolls.length ? 'active' : ''}`} onClick={() => setSheet(sheet === 'ask' ? null : 'ask')} aria-label="Ask the room">
             {Icon.poll}{openPolls.length > 0 && <b className="count">{openPolls.length}</b>}
           </button>
+          {hasWall && (
+            <button className={`ctl ${sheet === 'wall' ? 'active' : ''}`} onClick={() => setSheet(sheet === 'wall' ? null : 'wall')} aria-label="Wall">
+              <span style={{ fontSize: 18, lineHeight: '19px' }}>📌</span>{wallNew && <b className="count">•</b>}
+            </button>
+          )}
           <button className={`ctl ${sheet === 'more' ? 'active' : ''}`} onClick={() => setSheet(sheet === 'more' ? null : 'more')} aria-label="More">
             {Icon.more}
           </button>
@@ -726,6 +741,11 @@ export default function CallScreen({ session, call, onLeave }) {
                 ) : <PollComposer onAsk={ask} onCancel={() => setSheet(null)} />
               ) : sheet === 'ask-new' ? (
                 <PollComposer onAsk={ask} onCancel={() => setSheet('ask')} />
+              ) : sheet === 'wall' ? (
+                <>
+                  <h3>Wall <small style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 12 }}>· only people in this room see it</small></h3>
+                  <Wall slug={roomId} token={token} isHost={isHost} phone onToast={toast} />
+                </>
               ) : (
                 <>
                   <h3>More</h3>
@@ -835,6 +855,15 @@ export default function CallScreen({ session, call, onLeave }) {
           </aside>
         )}
 
+        {panel === 'wall' && (
+          <aside className="panel panel-wall" aria-label="Wall">
+            <div className="panel-head">
+              <h3>Wall <small>only people in this room see it</small></h3>
+              <button onClick={() => setPanel(null)} aria-label="Close wall">×</button>
+            </div>
+            <div className="panel-body"><Wall slug={roomId} token={token} isHost={isHost} onToast={toast} /></div>
+          </aside>
+        )}
         {panel === 'people' && (
           <aside className="panel" aria-label="Participants">
             <div className="panel-head">
@@ -876,6 +905,12 @@ export default function CallScreen({ session, call, onLeave }) {
           onClick={() => setPanel(panel === 'people' ? null : 'people')}>
           {Icon.people}<span>People</span>
         </button>
+        {hasWall && (
+          <button className={`ctl ${panel === 'wall' ? 'active' : ''} ${wallNew ? 'nudge' : ''}`}
+            onClick={() => setPanel(panel === 'wall' ? null : 'wall')} title="What this room remembers: videos, files, homework, messages">
+            <span style={{ fontSize: 18, lineHeight: '19px' }}>📌</span><span>Wall</span>
+          </button>
+        )}
         {isLang && (
           <button className={`ctl ${capOn && caps.listening ? 'active' : ''}`} onClick={() => setLangPick(true)} title="Captions and language">
             <span style={{ fontSize: 13, lineHeight: '19px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{capLang.slice(0, 2).toUpperCase()}</span><span>Captions</span>
