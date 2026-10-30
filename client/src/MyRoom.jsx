@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { whoAmI, saveRoom, deleteRoom, roomUrl, WALLS, WALL_CSS, DAYS, SLOTS } from './lib';
+import { whoAmI, saveRoom, deleteRoom, roomUrl, WALLS, WALL_CSS, DAYS, SLOTS, billingStatus, billingCheckout, billingPortal } from './lib';
 import { LANGS } from './useCaptions';
 
 const THEMES = [['plain', 'Plain room'], ['tutoring', 'Tutoring'], ['language', 'Language lesson'], ['meeting', 'Meeting'], ['study', 'Study hall'], ['family', 'Family']];
@@ -50,6 +50,18 @@ export default function MyRoom({ session, onOpen }) {
   const load = () => whoAmI(session.token).then(setMe).catch(() => setMe({ host: false, rooms: [] }));
   useEffect(() => { load(); }, [session.token]);
 
+  // ---- rent: what each room is paid through, and the two things for sale ----
+  const [bill, setBill] = useState(null);
+  const [rentMsg, setRentMsg] = useState(() => { const q = new URLSearchParams(location.search).get('rent'); return q === 'paid' ? 'Thank you — the rent is in. Stripe confirms it in a few seconds; the door stays open.' : q === 'cancelled' ? 'No charge was made.' : ''; });
+  useEffect(() => { billingStatus(session.token).then(setBill).catch(() => setBill({ ready: false, rooms: [] })); if (location.search.includes('rent=')) history.replaceState(null, '', '/'); }, [session.token, me?.rooms?.length]);
+  const [renting, setRenting] = useState('');
+  const rent = async (slug, plan) => {
+    setRenting(`${slug}:${plan}`); setErr('');
+    try { const { url } = await billingCheckout(session.token, slug, plan); location.assign(url); } catch (e) { setErr(e.message); setRenting(''); }
+  };
+  const manage = async (slug) => { try { const { url } = await billingPortal(session.token, slug); location.assign(url); } catch (e) { setErr(e.message); } };
+  const billOf = (slug) => bill?.rooms?.find((b) => b.slug === slug);
+  const fmtDay = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   if (!me || !me.host) return null;
 
   const blank = { slug: '', name: '', theme: 'tutoring', locked: true, tipLink: '', payLink: '', payNote: '', translate: false, tagline: '', about: '', aboutLang: 'en-US', priceNote: '', education: '', wall: '', welcome: '', avail: Array(21).fill(0), tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '', photo: '' };
@@ -66,6 +78,7 @@ export default function MyRoom({ session, onOpen }) {
   const copy = (slug) => navigator.clipboard?.writeText(roomUrl(slug)).then(() => { setCopied(slug); setTimeout(() => setCopied(''), 1500); });
   const set = (k, v) => setEdit((e) => ({ ...e, [k]: v }));
 
+
   return (
     <div className="myroom">
       <div className="myroom-head">
@@ -77,6 +90,18 @@ export default function MyRoom({ session, onOpen }) {
           <div>
             <b>{r.name}</b> <span className="muted">· {r.theme} · {r.locked ? 'door locked' : 'door open'}{r.expiresInDays <= 30 ? ` · unused ${r.idleDays} days — archived in ${r.expiresInDays}` : ''}</span>
             <div className="muted mono">{roomUrl(r.slug)}</div>
+            {bill && billOf(r.slug) && (() => { const b = billOf(r.slug); return (
+              <div className="rent">
+                <span className="muted">{b.comped ? 'Rent: on us for now.' : b.open ? `Rent paid through ${fmtDay(b.paidThrough)}${b.subscription ? ' · renews monthly' : b.plan === 'day' ? ' · day pass' : ' · not renewing'}.` : `Rent lapsed ${fmtDay(b.paidThrough)} — the door is closed.`}</span>
+                {bill.ready && (
+                  <span className="rent-btns">
+                    {!b.subscription && <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'month')}>{renting === `${r.slug}:month` ? 'Opening Stripe…' : `Rent monthly · $${bill.prices.month}`}</button>}
+                    <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'day')}>{renting === `${r.slug}:day` ? 'Opening Stripe…' : `Day pass · $${bill.prices.day}`}</button>
+                    {b.subscription && <button className="wb-btn" onClick={() => manage(r.slug)}>Billing</button>}
+                  </span>
+                )}
+              </div>
+            ); })()}
           </div>
           <div className="myroom-actions">
             <button className="wb-btn" onClick={() => copy(r.slug)}>{copied === r.slug ? 'Copied' : 'Copy link'}</button>
@@ -85,6 +110,7 @@ export default function MyRoom({ session, onOpen }) {
           </div>
         </div>
       ))}
+      {rentMsg && <p className="rent-msg">{rentMsg} <button className="ghost" onClick={() => setRentMsg('')} aria-label="Dismiss">×</button></p>}
       {me.rooms.length === 0 && !edit && <p className="muted" style={{ fontSize: 13.5 }}>You're an invited host. Create your room to get a link you can give students.</p>}
       {edit && (
         <div className="myroom-form">
@@ -160,7 +186,7 @@ export default function MyRoom({ session, onOpen }) {
           {!me.termsAcceptedAt && (
             <label className="agree">
               <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-              <span>I'm an adult, I'm responsible for who I let into my room, and I agree to the <a href="/rooms/#trust" target="_blank" rel="noopener">conduct rule</a> and the <a href="https://johnhubert.llc/privacy.html" target="_blank" rel="noopener">privacy policy</a>. Rooms unused for 90 days are archived.</span>
+              <span>I'm an adult, I'm responsible for who I let into my room, and I agree to the <a href="/rooms/terms.html" target="_blank" rel="noopener">terms</a>, the <a href="/rooms/conduct.html" target="_blank" rel="noopener">conduct rule</a> and the <a href="/rooms/privacy.html" target="_blank" rel="noopener">privacy policy</a>. Rooms unused for 90 days are archived.</span>
             </label>
           )}
           <p className="form-err">{err}</p>

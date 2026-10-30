@@ -43,3 +43,21 @@ export const socket = {
   _incoming: (from, text) => (handlers.chat || []).forEach((f) => f({ id: from, from, text }))
 };
 if (typeof window !== 'undefined') window.__demoSocket = socket;
+// ---- wall (Studio) ----
+let PINS = Q.get('studio') === '1' ? [
+  { id: 'w1', kind: 'homework', title: 'Preterite story', text: 'Write 10 sentences about last weekend. Use at least five irregular verbs.', due: new Date(Date.now() + 3 * 86400000), by: 'ortiz', host: true, ts: Date.now() - 86400000, hasFile: false, link: '' },
+  { id: 'w2', kind: 'video', title: 'Lesson 7 recap · ser vs estar', by: 'ortiz', host: true, ts: Date.now() - 3 * 86400000, hasFile: true, name: 'recap-7.mp4', size: 48 * 1048576 },
+  { id: 'w3', kind: 'file', title: 'Irregular verbs cheat sheet', by: 'ortiz', host: true, ts: Date.now() - 9 * 86400000, hasFile: true, name: 'irregulares.pdf', size: 220 * 1024 },
+  { id: 'w4', kind: 'handin', title: 'Homework 6', by: 'Jamie', host: false, mine: Q.get('host') !== '1', ts: Date.now() - 2 * 86400000, hasFile: true, name: 'hw6.pdf', size: 90 * 1024 },
+  { id: 'w5', kind: 'message', text: '¡Gracias por la clase de hoy! Por fin entiendo el pretérito.', by: 'Jamie', host: false, mine: Q.get('host') !== '1', ts: Date.now() - 2 * 86400000 },
+  { id: 'w6', kind: 'message', text: 'Recuerden: la próxima semana no hay clase el jueves.', by: 'ortiz', host: true, ts: Date.now() - 5 * 86400000 }
+] : [];
+export const wallList = async () => ({ pins: PINS, uploads: Q.get('noup') !== '1', limits: { pins: 60, bytes: 2147483648, video: 104857600, file: 26214400 } });
+export const wallPin = async (t, s, p) => { const pin = { id: 'w' + Date.now(), ...p, by: 'you', host: Q.get('host') === '1', mine: true, ts: Date.now(), hasFile: !!p.file, name: p.file?.name, size: p.file?.size }; PINS = [pin, ...PINS]; return { pin, upload: p.file ? 'mock' : null, uploadHeaders: null }; };
+export const wallDone = async () => ({});
+export const wallUrl = async () => ({ url: 'about:blank' });
+export const wallRemove = async (t, s, id) => { PINS = PINS.filter((p) => p.id !== id); return { ok: true }; };
+export const putFile = (u, h, f, on) => new Promise((r) => { let k = 0; const t = setInterval(() => { k += .2; on?.(Math.min(1, k)); if (k >= 1) { clearInterval(t); r(); } }, 150); });
+export const billingStatus = async () => ({ ready: true, prices: { month: 12, day: 2 }, rooms: [{ slug: 'ms-ortiz', comped: Q.get('rented') !== '1', paidThrough: Q.get('rented') === '1' ? new Date(Date.now() + 12 * 86400000) : null, plan: Q.get('rented') === '1' ? 'month' : '', open: true, subscription: Q.get('rented') === '1' }] });
+export const billingCheckout = async () => ({ url: 'about:blank' });
+export const billingPortal = async () => ({ url: 'about:blank' });

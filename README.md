@@ -205,3 +205,28 @@ cd client && npm run demo     # http://localhost:5174/?n=3&video=1&cam=1
 ```
 `n` = fake remote participants, `video=1` gives them moving canvas "video", `cam=1` turns your
 own camera tile on. Used to check the phone layout at iPhone sizes without a second device.
+
+## Rent (Stripe, hosted Checkout only)
+
+Hosts pay for the room; students never pay Cove. Two prices, both created in
+the Stripe Dashboard: a recurring **$12 / month** price and a one-time
+**$2 day pass**. Cove never sees a card: `POST /api/billing/checkout` sends the
+browser to Stripe, and Stripe's webhook (`POST /api/billing/webhook`, raw body,
+signature checked) is the only thing that moves a room's `paidThrough`.
+`paidThrough == null` is a comped room (invited host). The door closes when
+`paidThrough` passes; a failed renewal gets a 3-day grace while Stripe retries.
+`POST /api/billing/portal` opens Stripe's customer portal (change card, cancel).
+
+Render env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTH`,
+`STRIPE_PRICE_DAY`. Webhook events to subscribe: `checkout.session.completed`,
+`checkout.session.async_payment_succeeded`, `invoice.paid`,
+`customer.subscription.deleted`. Use test-mode keys first; card `4242 4242 4242 4242`.
+
+## Walls (Studio rooms)
+
+What a Studio room remembers between lessons: short videos, files to review,
+homework with a due date, students' hand-ins, and messages. Room-only; the
+front door never shows them. Files go straight from the browser to Cloudflare
+R2 by signed URL (`server/walls.js`). Render env: `R2_ACCOUNT_ID`,
+`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. Without them, link and
+text pins work and file pins answer 503.

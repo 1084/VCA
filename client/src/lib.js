@@ -67,3 +67,22 @@ export const WALLS = [['', 'Cove'], ['forest', 'Forest'], ['dusk', 'Dusk'], ['cl
 export const WALL_CSS = { '': '', forest: '#1A2E2A', dusk: '#2B2D44', clay: '#3A2A2A', slate: '#2A3240', plum: '#33223A' };
 export const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 export const SLOTS = ['morning', 'afternoon', 'evening'];
+// ---- Walls (Studio rooms): what the room remembers between lessons ----
+export const wallList = (token, slug) => api(`r/${encodeURIComponent(slug)}/wall`, { token });
+export const wallPin = (token, slug, pin) => api(`r/${encodeURIComponent(slug)}/wall`, { method: 'POST', token, body: pin });
+export const wallDone = (token, slug, id) => api(`r/${encodeURIComponent(slug)}/wall/${id}/done`, { method: 'POST', token });
+export const wallUrl = (token, slug, id) => api(`r/${encodeURIComponent(slug)}/wall/${id}/url`, { token });
+export const wallRemove = (token, slug, id) => api(`r/${encodeURIComponent(slug)}/wall/${id}`, { method: 'DELETE', token });
+// Browser → R2 directly, with progress. XHR because fetch has no upload progress.
+export const putFile = (url, headers, file, onProgress) => new Promise((resolve, reject) => {
+  const x = new XMLHttpRequest(); x.open('PUT', url);
+  for (const [k, v] of Object.entries(headers || {})) x.setRequestHeader(k, v);
+  x.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+  x.onload = () => (x.status >= 200 && x.status < 300 ? resolve() : reject(new Error(`Upload failed (${x.status})`)));
+  x.onerror = () => reject(new Error('Upload failed. Check your connection and try again.'));
+  x.send(file);
+});
+// ---- Billing (rent for the room; Stripe hosted Checkout) ----
+export const billingStatus = (token) => api('billing/status', { token });
+export const billingCheckout = (token, slug, plan) => api('billing/checkout', { method: 'POST', token, body: { slug, plan } });
+export const billingPortal = (token, slug) => api('billing/portal', { method: 'POST', token, body: { slug } });

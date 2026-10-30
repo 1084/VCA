@@ -486,3 +486,49 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .device-row{display:flex;gap:10px}
 .device-row select{flex:1;min-width:0;padding:9px 10px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);font-size:12.5px}
 .device-row select:focus{border-color:var(--amber);outline:none}
+
+/* ---- Wall (Studio rooms) ---- */
+.panel-wall{width:380px}
+.panel-head h3 small{display:block;font-family:var(--font-body,inherit);font-weight:400;font-size:11.5px;color:var(--muted);margin-top:2px}
+.ctl.nudge{border-color:rgba(255,180,84,.6);box-shadow:0 0 0 3px rgba(255,180,84,.14)}
+.wall{display:flex;flex-direction:column;gap:14px}
+.wall-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px}
+.wall-act{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);font-size:12px;color:var(--text)}
+.wall-act span{font-size:20px;line-height:1}
+.wall-act:hover{border-color:var(--amber)}
+.wall-empty{color:var(--muted);font-size:13.5px;line-height:1.5}
+.wall-err{color:#FFA3A3;font-size:13px}
+.wall-group h4{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:600}
+.pin{display:flex;align-items:flex-start;gap:6px;margin-bottom:8px}
+.pin-main{flex:1;text-align:left;padding:10px 12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);display:flex;flex-direction:column;gap:4px;min-width:0}
+.pin-main:not(:disabled):hover{border-color:var(--amber)}
+.pin-main:disabled{cursor:default}
+.pin-main b{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.pin-text,.pin-msg{font-size:13.5px;line-height:1.45;color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.pin.message .pin-main{background:rgba(255,180,84,.07);border-color:rgba(255,180,84,.2)}
+.pin-main small{font-size:11.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+.pin-main small .due{color:var(--amber)}
+.late{color:#FFA3A3}
+.pin-by{opacity:.85}
+.pin-x{color:var(--muted);font-size:18px;line-height:1;padding:8px 6px;border-radius:8px}
+.pin-x:hover{color:#FFA3A3;background:rgba(255,92,92,.1)}
+.wall-compose{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}
+.wall-compose h4{font-family:var(--font-display);font-weight:600;font-size:15px;margin:0}
+.wall-compose input:not([type=file]),.wall-compose textarea{width:100%;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--text);font:inherit;font-size:14px;resize:vertical}
+.wall-compose input:focus,.wall-compose textarea:focus{outline:none;border-color:var(--amber)}
+.wall-due{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.wall-due input{width:auto;flex:1}
+.wall-file{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wall-file .btn{padding:9px 14px;font-size:13px}
+.wall-fname,.wall-hint{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.wall-prog{height:6px;border-radius:3px;background:var(--surface);overflow:hidden}
+.wall-prog div{height:100%;background:var(--amber);transition:width .2s}
+.wall-compose-btns{display:flex;gap:8px;justify-content:flex-end}
+.wall-compose-btns .btn-primary{width:auto}
+.wall.phone{max-height:62vh;overflow-y:auto;padding-right:2px}
+
+/* ---- rent card (My rooms) ---- */
+.rent{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;font-size:12.5px}
+.rent-btns{display:flex;gap:6px;flex-wrap:wrap}
+.rent-msg{margin:8px 0 2px;padding:10px 12px;border-radius:10px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);font-size:13.5px;display:flex;justify-content:space-between;gap:10px}
+.rent-msg .ghost{color:var(--muted)}
