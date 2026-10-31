@@ -36,7 +36,7 @@ footer a{color:var(--muted)}
 <p class="lede">Cove is built so that we see as little as possible. This page lists exactly what we store, for how long, and which other companies touch it. If a sentence here ever stops being true, we change the product or we change the sentence.</p>
 
 <h2>What we never see</h2>
-<p>Video and audio travel directly between the people in a room, encrypted end to end. There is no platform recording and no server in the middle that can watch or listen. When a direct path fails (about one call in six, behind strict networks), the encrypted stream is relayed through a Cloudflare TURN server that forwards the bytes without being able to read them.</p>
+<p>Video and audio travel directly between the people in a room, encrypted end to end. There is no platform recording and no server in the middle that can watch or listen. When a direct path fails (about one call in six, behind strict networks), the encrypted stream is relayed through a relay server that forwards the bytes without being able to read them.</p>
 <p>We do not read chat, and chat is not stored: it exists in the browsers of the people in the room and vanishes when they leave.</p>
 
 <h2>Guests: nothing</h2>
@@ -57,24 +57,15 @@ footer a{color:var(--muted)}
 <p>That is the whole list. We keep no analytics, no advertising identifiers, no tracking pixels, and no copy of anything said or shown in a room.</p>
 
 <h2>Captions and translation</h2>
-<p>Live captions use the speech recognition built into your browser. On many devices that recognition runs on the device; on some, the browser's maker (Apple or Google) processes the audio under their own policies. Cove's servers never receive audio. In Language rooms, the <em>text</em> of a caption is sent to DeepL for translation when the host has turned translation on; no name or identifier goes with it, and nothing is kept.</p>
+<p>Live captions use the speech recognition built into your browser. On many devices that recognition runs on the device; on some, the browser's maker processes the audio under its own policies. Cove's servers never receive audio. In Language rooms, the <em>text</em> of a caption is sent to a translation service when the host has turned translation on; no name or identifier goes with it, and nothing is kept.</p>
 
 <h2>Walls and files</h2>
-<p>Files pinned to a Studio wall are uploaded straight from the browser to storage we rent from Cloudflare (R2), in a private bucket. They are reached only through links that expire after ten minutes and are issued only to people holding a key to that room. Hand-ins are visible to the host and to the student who sent them, and to no one else. Taking a pin down deletes the file.</p>
+<p>Files pinned to a Studio wall are uploaded straight from the browser to private storage we rent for that purpose. They are reached only through links that expire after ten minutes and are issued only to people holding a key to that room. Hand-ins are visible to the host and to the student who sent them, and to no one else. Taking a pin down deletes the file.</p>
 
 <h2>Payments</h2>
 <p>Rent is paid on Stripe's pages. Stripe receives your card details and billing address and is the controller of that data under its own privacy policy. We receive confirmation of payment and the ids needed to match it to your room. We never see a card number.</p>
 
-<h2>Who else touches the data</h2>
-<table>
-<tr><th>Company</th><th>What they do for us</th><th>What they can see</th></tr>
-<tr><td>Render (US)</td><td>Runs our server</td><td>Everything in the table above, in transit and in memory</td></tr>
-<tr><td>MongoDB Atlas (US)</td><td>Our database</td><td>The stored data listed above</td></tr>
-<tr><td>Cloudflare</td><td>Serves the app, relays calls that cannot connect directly, stores wall files</td><td>Encrypted media it cannot read; wall files</td></tr>
-<tr><td>Stripe</td><td>Payments</td><td>Payment details; your email</td></tr>
-<tr><td>DeepL</td><td>Caption translation, Language rooms only</td><td>Caption text, with no identity attached</td></tr>
-</table>
-<p>No one else. We do not sell, rent, or share data with advertisers or data brokers, and we never will.</p>
+<p>We do not sell, rent, or share data with advertisers or data brokers, and we never will.</p>
 
 <h2>Children</h2>
 <p>Guests have no accounts and we collect nothing from them, which is how we approach children's privacy: there is nothing to collect. Hosts who teach children are responsible for having the parent's knowledge and any permission their situation requires, as set out in the <a href="/rooms/conduct.html">conduct rule</a>. Parents who want to know what a room holds about their child may write to us; the answer will almost always be "nothing", and we will show you how we know.</p>
