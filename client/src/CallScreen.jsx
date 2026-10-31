@@ -496,7 +496,7 @@ export default function CallScreen({ session, call, onLeave }) {
         <div key={'m' + i} className="cap chatcap" onClick={() => setBand('chat')} title="Open chat"><span className="who">💬 {m.from}</span><span className="txt">{m.text}</span></div>
       ))}
       {captions.length === 0 && Object.keys(interim).length === 0 && (
-        <div className="cap hint">{caps.error ? caps.error : caps.supported ? (caps.listening ? 'Listening — captions appear here as people speak.' : capOn ? (micOn ? 'Starting captions…' : 'Unmute to caption your voice.') : 'Captions off.') : 'This browser can\'t transcribe; you\'ll still see others\' captions.'}</div>
+        <div className="cap hint">{caps.error ? caps.error : caps.supported ? (caps.listening ? 'Listening — captions appear here as people speak.' : capOn ? (micOn ? 'Starting captions…' : 'Unmute to caption your voice.') : 'Captions off.') : (/iPhone|iPad/.test(navigator.userAgent) ? 'This browser can\'t transcribe. On iPhone that is usually Lockdown Mode (Settings → Privacy & Security); see cove.johnhubert.llc/rooms/help.html. You\'ll still see others\' captions.' : 'This browser can\'t transcribe; you\'ll still see others\' captions.')}</div>
       )}
     </div>
   );

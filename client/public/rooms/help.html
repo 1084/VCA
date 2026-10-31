@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Help · Cove Rooms</title>
+<meta name="description" content="When a Cove room does not behave: the short list of things that fix it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Inter:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0C1518;--surface:#132026;--surface-2:#1A2A31;--line:rgba(232,239,240,.09);--text:#E8EFF0;--muted:#8CA1A7;--amber:#FFB454;--cyan:#7CCFDE;--display:"Bricolage Grotesque",sans-serif;--body:"Inter",sans-serif;--mono:"Spline Sans Mono",monospace}
+*{box-sizing:border-box;margin:0}
+body{background:var(--ink);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan)}
+.wrap{width:min(760px,100% - 40px);margin:0 auto;padding-bottom:60px}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 0 34px}
+.mark{display:inline-flex;align-items:center;gap:9px;font-family:var(--display);font-weight:700;font-size:19px;color:var(--text);text-decoration:none}
+.mark .dot{width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:0 0 12px rgba(255,180,84,.7)}
+.mark small{font-weight:400;color:var(--muted);font-size:14px}
+nav a{color:var(--muted);text-decoration:none;font-size:14px;margin-left:18px}nav a:hover,nav a.on{color:var(--text)}
+h1{font-family:var(--display);font-weight:600;font-size:clamp(30px,5vw,42px);letter-spacing:-.02em;line-height:1.1}
+.meta{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin:12px 0 26px}
+.lede{color:var(--muted);font-size:17.5px;margin-bottom:30px}
+h2{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.01em;margin:38px 0 10px}
+h3{font-family:var(--display);font-weight:600;font-size:17px;margin:22px 0 6px}
+p,li{margin-bottom:12px}ul,ol{padding-left:22px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 20px;margin:18px 0}
+.box b{color:var(--amber)}
+table{width:100%;border-collapse:collapse;font-size:14.5px;margin:14px 0}td,th{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:500}
+footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;font-size:13px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+footer a{color:var(--muted)}
+@media (max-width:640px){nav a{margin-left:12px}}
+</style></head><body><div class="wrap">
+<header><a class="mark" href="/rooms/"><span class="dot"></span>Cove <small>Rooms</small></a>
+<nav><a href="/rooms/terms.html">Terms</a><a href="/rooms/conduct.html">Conduct</a><a href="/rooms/privacy.html">Privacy</a><a href="/rooms/help.html" class="on">Help</a></nav></header>
+
+<h1>When something isn't working</h1>
+<p class="meta">Troubleshooting · updated October 31, 2026</p>
+<p class="lede">Cove runs in the browser with nothing to install, so most problems are one setting away. Start with the first section; it fixes the majority of reports we get from iPhones.</p>
+
+<h2>iPhone or iPad: you can't see or hear the others, or captions say the browser can't transcribe</h2>
+<div class="box"><p style="margin:0"><b>Check Lockdown Mode first.</b> Settings → Privacy &amp; Security → Lockdown Mode. If it's on, Safari blocks the parts of the web that live video and on-device captions need. Turn it off for the lesson (or add <em>cove.johnhubert.llc</em> as an excluded site: in Safari tap <b>aA</b> in the address bar → Website Settings → turn off Lockdown Mode for this site), then reload the room.</p></div>
+<p>You'll know Lockdown Mode is the cause if Safari shows <em>Lockdown Enabled</em> under the address bar, or the captions band reads "This browser can't transcribe."</p>
+
+<h2>The door says "Wait at the door" or nothing happens when you knock</h2>
+<p>The host hasn't opened the room yet, or they're not in it. Knocks only reach a host who is inside. Stay on the page; when they arrive, your knock goes through and they tap <b>Let in</b>.</p>
+<p>If you were already in the room and find yourself at the door again, your connection dropped for a moment (locking the phone or switching apps does it). You're let back in automatically as long as the host is still there.</p>
+
+<h2>People can't hear you</h2>
+<ul>
+<li>Check the mic button at the bottom: red means muted.</li>
+<li>iPhone: Settings → Safari → Microphone → Allow, then reload. In the room, the first tap on <b>Mic</b> asks permission; if you declined once, Safari remembers until you change it there.</li>
+<li>Bluetooth earbuds sometimes grab the mic but not the speaker, or the other way round. Try with them off once to tell which.</li>
+<li>Another app may hold the microphone (a call, a voice memo). End it and tap Mic again.</li>
+</ul>
+
+<h2>You can't hear them</h2>
+<p>Browsers won't play sound until you've touched the page. If you see <b>Tap to enable incoming audio</b>, tap it. Check the ring/silent switch on an iPhone: Safari respects it for web audio on some iOS versions. Check the volume.</p>
+
+<h2>Video is black or frozen</h2>
+<ul>
+<li>Camera permission: iPhone Settings → Safari → Camera → Allow. Android: the lock icon in the address bar → Permissions.</li>
+<li>Only one app can use the camera at a time. Close any other video app.</li>
+<li>On a weak connection Cove keeps the audio and lets the video stall. Move closer to the router or off a VPN; corporate VPNs often block the relay that video needs.</li>
+<li>Still stuck: leave and rejoin. A fresh connection fixes most one-off freezes.</li>
+</ul>
+
+<h2>Captions</h2>
+<ul>
+<li>Captions are made by each person's own phone and shared as text. You caption your voice; you read theirs. If yours don't appear, unmute first.</li>
+<li>iPhone: captions use Dictation. Settings → General → Keyboard → Enable Dictation. And see Lockdown Mode above.</li>
+<li>Firefox and some privacy browsers have no speech recognition at all; you'll still see everyone else's captions.</li>
+<li>Pick the language you'll speak with the <b>EN</b> button; captioning the wrong language produces nonsense.</li>
+</ul>
+
+<h2>The Wall</h2>
+<ul>
+<li>The Wall is only in Studio rooms, and only once you're inside; it isn't on the front door.</li>
+<li>Uploads: videos up to 100 MB (MP4, WebM or MOV), files up to 25 MB. A file that fails instantly is usually a type we don't accept (we list the common ones) or a size over the limit.</li>
+<li>Hand-ins are seen by the host and the student who sent them, nobody else. That's on purpose.</li>
+</ul>
+
+<h2>Links and the room code</h2>
+<p>A named room's link looks like <code>cove.johnhubert.llc/r/your-room</code>. Open it in the browser, not inside the Messages or Instagram preview, which sometimes blocks the camera; tap the link, then if it opened in an in-app browser, use its menu to open in Safari or Chrome.</p>
+
+<h2>Hosts: rent, the door, and removing someone</h2>
+<ul>
+<li>Rent status and the Rent / Billing buttons are in the lobby under <b>My rooms</b>. Payment happens on Stripe's page; if you come back and the status hasn't changed after a minute, reload — and if it shows "Rent status: … Retry", your sign-in has likely expired; sign in again.</li>
+<li><b>Door</b> locks and unlocks. Locked means guests knock and you let them in; unlocked means anyone with the link walks in.</li>
+<li><b>Remove</b> (in People) puts someone out, keeps them out for the rest of your session, and locks the door.</li>
+</ul>
+
+<h2>Still stuck?</h2>
+<p>Write to <a href="mailto:support@johnhubert.llc">support@johnhubert.llc</a> with the room name, the device and browser, and what you saw. A person reads it, usually the same day. Please don't send recordings; we don't need them and we'd rather not have them.</p>
+
+<footer><span>© 2026 John Hubert LLC · Virginia · <a href="https://johnhubert.llc/">johnhubert.llc</a></span><span><a href="mailto:support@johnhubert.llc">support@johnhubert.llc</a></span></footer>
+</div></body></html>
