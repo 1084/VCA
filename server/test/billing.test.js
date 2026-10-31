@@ -10,7 +10,9 @@ const { attachBilling, GRACE, DAY } = require('../billing');
 const SECRET = 'test';
 const rooms = new Map();
 const mk = (r) => { const o = { paidThrough: null, plan: '', stripeCustomerId: '', stripeSubscriptionId: '', ...r, save: async function () { } }; rooms.set(o.slug, o); return o; };
-mk({ slug: 'ms-ortiz', ownerEmail: 'ortiz@example.com' });
+mk({ slug: 'ms-ortiz', ownerEmail: 'ortiz@example.com', studio: false });
+const users = { 'ortiz@example.com': { studio: false } };
+const User = { updateOne: async (f, u) => { Object.assign(users[f.email] ||= {}, u); } };
 const find = (f) => [...rooms.values()].find((r) => Object.entries(f).every(([k, v]) => r[k] === v)) || null;
 const Room = { findOne: async (f) => find(f), find: (f) => ({ lean: async () => [...rooms.values()].filter((r) => r.ownerEmail === f.ownerEmail) }) };
 const created = [];
@@ -27,7 +29,7 @@ const requireAuth = (req, res, next) => { try { req.user = jwt.verify((req.get('
   let hook;
   app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), (req, res) => hook(req, res));
   app.use(express.json());
-  ({ webhook: hook } = attachBilling(app, { stripe, requireAuth, Room, User: {}, webhookSecret: 'whsec', prices: { month: 'price_m', day: 'price_d' }, origin: 'https://cove.test', log }));
+  ({ webhook: hook } = attachBilling(app, { stripe, requireAuth, Room, webhookSecret: 'whsec', prices: { month: 'price_m', studio: 'price_s', day: 'price_d' }, origin: 'https://cove.test', log, User }));
   const server = http.createServer(app); await new Promise((r) => server.listen(0, r));
   const base = `http://localhost:${server.address().port}/api/billing`;
   const tok = jwt.sign({ email: 'ortiz@example.com' }, SECRET);
@@ -77,6 +79,23 @@ const requireAuth = (req, res, next) => { try { req.user = jwt.verify((req.get('
   assert.ok(Math.abs(room.paidThrough.getTime() - (end3 * 1000 + GRACE)) < 5000, 'parent.subscription_details shape handled');
   // an invoice with no subscription at all (a one-off) is ignored without error
   assert.equal((await event('invoice.paid', { lines: { data: [] } })).status, 200);
+  // tier follows the money: still Room after a Room lease
+  assert.equal(room.studio, false); assert.equal(users['ortiz@example.com'].studio, false);
+  // a switch to Studio in the portal → subscription.updated with the studio price → Studio on at once
+  await event('customer.subscription.updated', { id: 'sub_1', items: { data: [{ price: { id: 'price_s' } }] } });
+  assert.equal(room.studio, true); assert.equal(room.plan, 'studio'); assert.equal(users['ortiz@example.com'].studio, true);
+  // the next invoice carries the studio price and keeps it
+  await event('invoice.paid', { parent: { subscription_details: { subscription: 'sub_1', metadata: { slug: 'ms-ortiz' } } }, lines: { data: [{ period: { end: end3 + 86400 }, pricing: { price_details: { price: 'price_s' } } }] } });
+  assert.equal(room.studio, true);
+  // and back to Room at the following invoice
+  await event('invoice.paid', { parent: { subscription_details: { subscription: 'sub_1', metadata: { slug: 'ms-ortiz' } } }, lines: { data: [{ period: { end: end3 + 2 * 86400 }, pricing: { price_details: { price: 'price_m' } } }] } });
+  assert.equal(room.studio, false); assert.equal(users['ortiz@example.com'].studio, false);
+  // a fresh Studio checkout on a room with no lease
+  await event('customer.subscription.deleted', { id: 'sub_1' });
+  r = await post('checkout', { slug: 'ms-ortiz', plan: 'studio' }); assert.equal(created.at(-1).line_items[0].price, 'price_s'); assert.equal(created.at(-1).mode, 'subscription');
+  await event('checkout.session.completed', { payment_status: 'paid', mode: 'subscription', customer: 'cus_1', subscription: 'sub_2', metadata: { slug: 'ms-ortiz', plan: 'studio' } });
+  assert.equal(room.studio, true); assert.equal(room.stripeSubscriptionId, 'sub_2'); assert.equal(room.plan, 'studio');
+  room.stripeSubscriptionId = 'sub_1';
   // cancellation: subscription id cleared, paidThrough kept (door closes when it lapses)
   await event('customer.subscription.deleted', { id: 'sub_1' });
   assert.equal(room.stripeSubscriptionId, ''); assert.ok(room.paidThrough.getTime() > Date.now());
@@ -85,7 +104,7 @@ const requireAuth = (req, res, next) => { try { req.user = jwt.verify((req.get('
 
   // unconfigured: 503, never a crash
   const app2 = express(); app2.use(express.json());
-  attachBilling(app2, { stripe: null, requireAuth, Room, User: {}, webhookSecret: '', prices: { month: '', day: '' }, origin: 'x', log });
+  attachBilling(app2, { stripe: null, requireAuth, Room, User, webhookSecret: '', prices: { month: '', day: '' }, origin: 'x', log });
   const s2 = http.createServer(app2); await new Promise((r) => s2.listen(0, r));
   const r2 = await fetch(`http://localhost:${s2.address().port}/api/billing/checkout`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, 'content-type': 'application/json' }, body: JSON.stringify({ slug: 'ms-ortiz' }) });
   assert.equal(r2.status, 503);

@@ -101,12 +101,13 @@ export default function MyRoom({ session, onOpen }) {
             <div className="muted mono">{roomUrl(r.slug)}</div>
             {bill && billOf(r.slug) && (() => { const b = billOf(r.slug); return (
               <div className="rent">
-                <span className="muted">{b.comped ? 'Rent: on us for now.' : b.open ? `Rent paid through ${fmtDay(b.paidThrough)}${b.subscription ? ' · renews monthly' : b.plan === 'day' ? ' · day pass' : ' · not renewing'}.` : `Rent lapsed ${fmtDay(b.paidThrough)} — the door is closed.`}</span>
+                <span className="muted">{b.comped ? 'Rent: on us for now.' : b.open ? `${b.plan === 'studio' ? 'Studio' : b.plan === 'day' ? 'Day pass' : 'Room'} paid through ${fmtDay(b.paidThrough)}${b.subscription ? ' · renews monthly' : b.plan === 'day' ? '' : ' · not renewing'}.` : `Rent lapsed ${fmtDay(b.paidThrough)} — the door is closed.`}</span>
                 {bill.ready && (
                   <span className="rent-btns">
-                    {!b.subscription && <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'month')}>{renting === `${r.slug}:month` ? 'Opening Stripe…' : `Rent monthly · $${bill.prices.month}`}</button>}
+                    {!b.subscription && <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'month')}>{renting === `${r.slug}:month` ? 'Opening Stripe…' : `Room · $${bill.prices.month}/mo`}</button>}
+                    {!b.subscription && bill.studioReady && <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'studio')}>{renting === `${r.slug}:studio` ? 'Opening Stripe…' : `Studio · $${bill.prices.studio}/mo`}</button>}
                     <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'day')}>{renting === `${r.slug}:day` ? 'Opening Stripe…' : `Day pass · $${bill.prices.day}`}</button>
-                    {b.subscription && <button className="wb-btn" onClick={() => manage(r.slug)}>Billing</button>}
+                    {b.subscription && <button className="wb-btn" onClick={() => manage(r.slug)} title="Change plan, card, or cancel">Billing</button>}
                   </span>
                 )}
               </div>

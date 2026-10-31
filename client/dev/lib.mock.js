@@ -58,6 +58,6 @@ export const wallDone = async () => ({});
 export const wallUrl = async () => ({ url: 'about:blank' });
 export const wallRemove = async (t, s, id) => { PINS = PINS.filter((p) => p.id !== id); return { ok: true }; };
 export const putFile = (u, h, f, on) => new Promise((r) => { let k = 0; const t = setInterval(() => { k += .2; on?.(Math.min(1, k)); if (k >= 1) { clearInterval(t); r(); } }, 150); });
-export const billingStatus = async () => ({ ready: true, prices: { month: 12, day: 2 }, rooms: [{ slug: 'ms-ortiz', comped: Q.get('rented') !== '1', paidThrough: Q.get('rented') === '1' ? new Date(Date.now() + 12 * 86400000) : null, plan: Q.get('rented') === '1' ? 'month' : '', open: true, subscription: Q.get('rented') === '1' }] });
+export const billingStatus = async () => ({ ready: true, studioReady: true, prices: { month: 12, studio: 20, day: 2 }, rooms: [{ slug: 'ms-ortiz', comped: Q.get('rented') !== '1', paidThrough: Q.get('rented') === '1' ? new Date(Date.now() + 12 * 86400000) : null, plan: Q.get('rented') === '1' ? 'month' : '', open: true, subscription: Q.get('rented') === '1' }] });
 export const billingCheckout = async () => ({ url: 'about:blank' });
 export const billingPortal = async () => ({ url: 'about:blank' });

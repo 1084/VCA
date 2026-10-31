@@ -156,7 +156,7 @@ attachRooms(app, io, { secret: SECRET, adminKey: process.env.ADMIN_KEY || '', re
 const billing = attachBilling(app, {
   stripe: makeStripe(process.env), requireAuth, Room: RoomModel, User,
   webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
-  prices: { month: process.env.STRIPE_PRICE_MONTH || '', day: process.env.STRIPE_PRICE_DAY || '' },
+  prices: { month: process.env.STRIPE_PRICE_MONTH || '', studio: process.env.STRIPE_PRICE_STUDIO || '', day: process.env.STRIPE_PRICE_DAY || '' },
   origin: CLIENT_ORIGIN[0] || 'http://localhost:5173'
 });
 billingWebhook = billing.webhook;

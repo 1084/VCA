@@ -208,9 +208,12 @@ own camera tile on. Used to check the phone layout at iPhone sizes without a sec
 
 ## Rent (Stripe, hosted Checkout only)
 
-Hosts pay for the room; students never pay Cove. Two prices, both created in
-the Stripe Dashboard: a recurring **$12 / month** price and a one-time
-**$2 day pass**. Cove never sees a card: `POST /api/billing/checkout` sends the
+Hosts pay for the room; students never pay Cove. Three prices, all created in
+the Stripe Dashboard: a recurring **$12 / month** Room lease, a recurring
+**$20 / month** Studio lease, and a one-time **$2 day pass**. The tier follows
+the money: a Studio lease turns on the front-door page and the Wall for that
+room and its host; a switch to Room in the customer portal turns them off.
+Comped rooms (invited hosts, `paidThrough == null`) keep the admin-set tier. Cove never sees a card: `POST /api/billing/checkout` sends the
 browser to Stripe, and Stripe's webhook (`POST /api/billing/webhook`, raw body,
 signature checked) is the only thing that moves a room's `paidThrough`.
 `paidThrough == null` is a comped room (invited host). The door closes when
@@ -218,9 +221,16 @@ signature checked) is the only thing that moves a room's `paidThrough`.
 `POST /api/billing/portal` opens Stripe's customer portal (change card, cancel).
 
 Render env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTH`,
-`STRIPE_PRICE_DAY`. Webhook events to subscribe: `checkout.session.completed`,
+`STRIPE_PRICE_STUDIO`, `STRIPE_PRICE_DAY`. Webhook events to subscribe: `checkout.session.completed`,
 `checkout.session.async_payment_succeeded`, `invoice.paid`,
-`customer.subscription.deleted`. Use test-mode keys first; card `4242 4242 4242 4242`.
+`customer.subscription.updated`, `customer.subscription.deleted`. In the customer
+portal settings, allow switching between the Room and Studio prices so hosts can
+change tier themselves.
+
+**Promo codes** are Stripe's: Product catalog → Coupons → create (percent or
+amount off, once / N months / forever) → add a promotion code (the word people
+type, e.g. `FIRSTMONTH`). Checkout already shows the code field. A 100% coupon
+for one month is the clean way to comp a first month. Use test-mode keys first; card `4242 4242 4242 4242`.
 
 ## Walls (Studio rooms)
 

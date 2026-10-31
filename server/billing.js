@@ -1,8 +1,12 @@
 // Cove Rooms billing: rent, not commission.
 //
-// Two things are for sale, both through Stripe's hosted Checkout page:
-//   month  a subscription ($12 / month on the rooms page), renews until cancelled
-//   day    a one-time day pass ($2 / 24 hours)
+// Three things are for sale, all through Stripe's hosted Checkout page:
+//   month   a Room lease ($12 / month), renews until cancelled
+//   studio  a Studio lease ($20 / month): the Room plus the front-door page and the Wall
+//   day     a one-time day pass ($2 / 24 hours)
+// The tier follows the money: paying for Studio turns the Studio features on
+// for that room and its host; switching to Room (via the portal) turns them
+// off at the next invoice. Comped rooms keep whatever tier the admin set.
 // Cove never sees a card number. The browser is sent to Stripe, pays there,
 // and Stripe tells us by webhook. The room's `paidThrough` moves forward and
 // the door opens or closes on that date alone (see roomIsOpen in rooms.js).
@@ -14,13 +18,24 @@
 // the tutor's own links; Cove charges the host for the room and nothing else.
 //
 // Env: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_MONTH,
-//      STRIPE_PRICE_DAY, CLIENT_ORIGIN (first origin is used for return URLs).
+//      STRIPE_PRICE_STUDIO, STRIPE_PRICE_DAY, CLIENT_ORIGIN (first origin is used for return URLs).
 
 const DAY = 86400000;
 const GRACE = 3 * DAY; // a renewal that fails keeps the door open this long while Stripe retries
 
 function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, prices, origin, log = console.log }) {
   const ready = !!(stripe && prices.month && prices.day);
+  const PLANS = { month: 'month', studio: 'studio', day: 'day' };
+  const planOfPrice = (priceId) => (priceId && priceId === prices.studio ? 'studio' : priceId && priceId === prices.month ? 'month' : null);
+  const isLease = (plan) => plan === 'month' || plan === 'studio';
+  // The tier follows what was paid for. Only called from webhook events.
+  const setTier = async (room, plan) => {
+    if (!isLease(plan)) return;
+    const studio = plan === 'studio';
+    if (room.studio !== studio) { room.studio = studio; await room.save(); }
+    await User.updateOne({ email: room.ownerEmail }, { studio }).catch(() => {});
+    log(`billing: ${room.slug} is now ${studio ? 'Studio' : 'Room'} tier`);
+  };
   const notReady = (res) => res.status(503).json({ error: 'Billing is not set up yet.' });
   const ownRoom = async (req, res) => {
     const room = await Room.findOne({ slug: String(req.body?.slug || req.query?.slug || ''), ownerEmail: req.user.email });
@@ -31,8 +46,8 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
   // What the lobby needs to show the Rent card.
   app.get('/api/billing/status', requireAuth, async (req, res) => {
     const rooms = await Room.find({ ownerEmail: req.user.email }).lean();
-    res.json({ ready, prices: { month: 12, day: 2 }, rooms: rooms.map((r) => ({
-      slug: r.slug, comped: !r.paidThrough, paidThrough: r.paidThrough, plan: r.plan || '', open: !r.paidThrough || r.paidThrough.getTime() > Date.now(), subscription: !!r.stripeSubscriptionId
+    res.json({ ready, studioReady: ready && !!prices.studio, prices: { month: 12, studio: 20, day: 2 }, rooms: rooms.map((r) => ({
+      slug: r.slug, comped: !r.paidThrough, paidThrough: r.paidThrough, plan: r.plan || '', studio: !!r.studio, open: !r.paidThrough || r.paidThrough.getTime() > Date.now(), subscription: !!r.stripeSubscriptionId
     })) });
   });
 
@@ -40,10 +55,11 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
   app.post('/api/billing/checkout', requireAuth, async (req, res) => {
     if (!ready) return notReady(res);
     const room = await ownRoom(req, res); if (!room) return;
-    const plan = req.body?.plan === 'day' ? 'day' : 'month';
-    if (plan === 'month' && room.stripeSubscriptionId) return res.status(409).json({ error: 'This room already has a monthly lease. Manage it from Billing.' });
+    const plan = PLANS[req.body?.plan] || 'month';
+    if (plan === 'studio' && !prices.studio) return res.status(503).json({ error: 'Studio leases are not set up yet.' });
+    if (isLease(plan) && room.stripeSubscriptionId) return res.status(409).json({ error: 'This room already has a monthly lease. Change or cancel it from Billing.' });
     const params = {
-      mode: plan === 'month' ? 'subscription' : 'payment',
+      mode: isLease(plan) ? 'subscription' : 'payment',
       line_items: [{ price: prices[plan], quantity: 1 }],
       client_reference_id: room.slug,
       metadata: { slug: room.slug, email: req.user.email, plan },
@@ -52,7 +68,7 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
       allow_promotion_codes: true
     };
     if (room.stripeCustomerId) params.customer = room.stripeCustomerId; else params.customer_email = req.user.email;
-    if (plan === 'month') params.subscription_data = { metadata: { slug: room.slug } };
+    if (isLease(plan)) params.subscription_data = { metadata: { slug: room.slug } };
     const session = await stripe.checkout.sessions.create(params);
     res.json({ url: session.url });
   });
@@ -75,6 +91,8 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
     Object.assign(room, patch);
     await room.save();
     log(`billing: ${slug} paid through ${room.paidThrough.toISOString()} (${patch.plan || room.plan})`);
+    if (isLease(patch.plan)) await setTier(room, patch.plan);
+    return room;
   };
   const webhook = async (req, res) => {
     if (!stripe || !webhookSecret) return res.status(503).end();
@@ -84,7 +102,7 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
     try {
       const o = ev.data.object;
       if (ev.type === 'checkout.session.completed' && o.payment_status === 'paid' || ev.type === 'checkout.session.async_payment_succeeded') {
-        const slug = o.metadata?.slug || o.client_reference_id; const plan = o.metadata?.plan || (o.mode === 'subscription' ? 'month' : 'day');
+        const slug = o.metadata?.slug || o.client_reference_id; const plan = PLANS[o.metadata?.plan] || (o.mode === 'subscription' ? 'month' : 'day');
         if (plan === 'day') {
           // a pass bought while one is running starts when that one ends: nothing paid for is lost
           const cur = await Room.findOne({ slug }); const from = Math.max(Date.now(), cur?.paidThrough?.getTime() || 0);
@@ -96,17 +114,26 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
           // current_period_end lives on the subscription in older API versions and on its item in newer ones
           const cpe = sub?.current_period_end || sub?.items?.data?.[0]?.current_period_end;
           const end = cpe ? cpe * 1000 : Date.now() + 31 * DAY;
-          await extend(slug, end + GRACE, { plan: 'month', stripeCustomerId: o.customer || undefined, stripeSubscriptionId: o.subscription || undefined });
+          await extend(slug, end + GRACE, { plan, stripeCustomerId: o.customer || undefined, stripeSubscriptionId: o.subscription || undefined });
         }
       } else if (ev.type === 'invoice.paid') {
         // older API versions: invoice.subscription / subscription_details; newer: invoice.parent.subscription_details
         const sd = o.parent?.subscription_details || o.subscription_details || {};
         const subId = o.subscription || sd.subscription || o.lines?.data?.[0]?.parent?.subscription_item_details?.subscription || '';
         if (!subId) return res.json({ received: true });
-        const slug = sd.metadata?.slug || o.lines?.data?.[0]?.metadata?.slug;
-        const end = (o.lines?.data?.[0]?.period?.end || 0) * 1000;
-        if (slug && end) await extend(slug, end + GRACE, { plan: 'month' });
-        else { const room = await Room.findOne({ stripeSubscriptionId: subId }); if (room && end) await extend(room.slug, end + GRACE, { plan: 'month' }); }
+        const line = o.lines?.data?.[0] || {};
+        const slug = sd.metadata?.slug || line.metadata?.slug;
+        const end = (line.period?.end || 0) * 1000;
+        // which lease was paid: the line's price tells us (handles a plan switch made in the portal)
+        const priceId = line.pricing?.price_details?.price || line.price?.id || '';
+        const plan = planOfPrice(priceId) || 'month';
+        if (slug && end) await extend(slug, end + GRACE, { plan });
+        else { const room = await Room.findOne({ stripeSubscriptionId: subId }); if (room && end) await extend(room.slug, end + GRACE, { plan }); }
+      } else if (ev.type === 'customer.subscription.updated') {
+        // a plan switch in the portal: the tier follows the new price right away
+        const room = await Room.findOne({ stripeSubscriptionId: o.id });
+        const plan = planOfPrice(o.items?.data?.[0]?.price?.id);
+        if (room && plan && room.plan !== plan) { room.plan = plan; await room.save(); await setTier(room, plan); }
       } else if (ev.type === 'customer.subscription.deleted') {
         const room = await Room.findOne({ stripeSubscriptionId: o.id });
         if (room) { room.stripeSubscriptionId = ''; await room.save(); log(`billing: ${room.slug} subscription ended; door closes ${room.paidThrough?.toISOString()}`); }
