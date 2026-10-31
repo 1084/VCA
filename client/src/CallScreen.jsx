@@ -147,6 +147,17 @@ export default function CallScreen({ session, call, onLeave }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportText, setReportText] = useState('');
   const isHost = !!room && room.hostName === me && !session.guest;
+  const isHostRef = useRef(false); isHostRef.current = isHost;
+  const knocksRef = useRef([]); knocksRef.current = knocks;
+  const chimeTimers = useRef({});
+  const sounds = useRef({});
+  const play = (name) => {
+    try {
+      const a = sounds.current[name] || (sounds.current[name] = Object.assign(new Audio(`/sounds/${name}.mp3`), { volume: 0.6 }));
+      a.currentTime = 0; a.play().catch(() => {}); // blocked until the host has touched the page; then it just works
+    } catch { /* no audio here */ }
+  };
+  useEffect(() => () => Object.values(chimeTimers.current).forEach(clearTimeout), []);
   const wall = room?.studio ? WALL_CSS[room.wall] || '' : '';
   const welcomeText = room?.studio && room.welcome ? room.welcome.replace(/\{name\}/g, me) : '';
   const hasWall = !!room?.studio && door === 'in';
@@ -268,7 +279,16 @@ export default function CallScreen({ session, call, onLeave }) {
     const onKnocking = ({ room: r }) => { setRoom(r); setDoor('knocking'); };
     const onAdmitted = () => { setDoor('in'); toast('You\'re in'); };
     const onDenied = ({ reason, room: r } = {}) => { if (r) setRoom(r); setDeniedWhy(reason || ''); setDoor('denied'); };
-    const onKnock = ({ id, name }) => setKnocks((k) => (k.some((x) => x.id === id) ? k : [...k, { id, name }]));
+    // Someone's at the door: two soft knocks at once, and a gentle chime 3 s
+    // later if the host still hasn't answered. Hosts only; one sound per knock.
+    const onKnock = ({ id, name }) => setKnocks((k) => {
+      if (k.some((x) => x.id === id)) return k;
+      if (isHostRef.current) {
+        play('knock');
+        chimeTimers.current[id] = setTimeout(() => { delete chimeTimers.current[id]; if (knocksRef.current.some((x) => x.id === id)) play('chime'); }, 3000);
+      }
+      return [...k, { id, name }];
+    });
     const onKnockGone = ({ id }) => setKnocks((k) => k.filter((x) => x.id !== id));
     const onReported = () => { setReportOpen(false); setReportText(''); toast('Report sent. A person will read it.'); };
     const onCaption = (c) => {
