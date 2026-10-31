@@ -17,7 +17,7 @@ const created = [];
 const stripe = {
   checkout: { sessions: { create: async (p) => { created.push(p); return { url: 'https://checkout.stripe.test/s' }; } } },
   billingPortal: { sessions: { create: async () => ({ url: 'https://portal.stripe.test' }) } },
-  subscriptions: { retrieve: async (id) => ({ id, current_period_end: Math.floor((Date.now() + 30 * DAY) / 1000) }) },
+  subscriptions: { retrieve: async (id) => ({ id, items: { data: [{ current_period_end: Math.floor((Date.now() + 30 * DAY) / 1000) }] } }) },
   webhooks: { constructEvent: (body, sig) => { if (sig !== 'good') throw new Error('bad sig'); return JSON.parse(body); } }
 };
 const requireAuth = (req, res, next) => { try { req.user = jwt.verify((req.get('authorization') || '').slice(7), SECRET); next(); } catch { res.status(401).end(); } };
@@ -71,6 +71,12 @@ const requireAuth = (req, res, next) => { try { req.user = jwt.verify((req.get('
   const end2 = Math.floor((Date.now() + 60 * DAY) / 1000);
   await event('invoice.paid', { subscription: 'sub_1', subscription_details: { metadata: { slug: 'ms-ortiz' } }, lines: { data: [{ period: { end: end2 } }] } });
   assert.ok(Math.abs(room.paidThrough.getTime() - (end2 * 1000 + GRACE)) < 5000);
+  // newest API shape: subscription under invoice.parent, no slug metadata → matched by subscription id
+  const end3 = Math.floor((Date.now() + 90 * DAY) / 1000);
+  await event('invoice.paid', { parent: { subscription_details: { subscription: 'sub_1', metadata: {} } }, lines: { data: [{ period: { end: end3 } }] } });
+  assert.ok(Math.abs(room.paidThrough.getTime() - (end3 * 1000 + GRACE)) < 5000, 'parent.subscription_details shape handled');
+  // an invoice with no subscription at all (a one-off) is ignored without error
+  assert.equal((await event('invoice.paid', { lines: { data: [] } })).status, 200);
   // cancellation: subscription id cleared, paidThrough kept (door closes when it lapses)
   await event('customer.subscription.deleted', { id: 'sub_1' });
   assert.equal(room.stripeSubscriptionId, ''); assert.ok(room.paidThrough.getTime() > Date.now());

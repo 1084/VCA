@@ -93,14 +93,20 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
         else {
           // the subscription's own period end is authoritative; invoice.paid below repeats it each cycle
           const sub = o.subscription ? await stripe.subscriptions.retrieve(o.subscription) : null;
-          const end = sub?.current_period_end ? sub.current_period_end * 1000 : Date.now() + 31 * DAY;
+          // current_period_end lives on the subscription in older API versions and on its item in newer ones
+          const cpe = sub?.current_period_end || sub?.items?.data?.[0]?.current_period_end;
+          const end = cpe ? cpe * 1000 : Date.now() + 31 * DAY;
           await extend(slug, end + GRACE, { plan: 'month', stripeCustomerId: o.customer || undefined, stripeSubscriptionId: o.subscription || undefined });
         }
-      } else if (ev.type === 'invoice.paid' && o.subscription) {
-        const slug = o.subscription_details?.metadata?.slug || o.lines?.data?.[0]?.metadata?.slug;
+      } else if (ev.type === 'invoice.paid') {
+        // older API versions: invoice.subscription / subscription_details; newer: invoice.parent.subscription_details
+        const sd = o.parent?.subscription_details || o.subscription_details || {};
+        const subId = o.subscription || sd.subscription || o.lines?.data?.[0]?.parent?.subscription_item_details?.subscription || '';
+        if (!subId) return res.json({ received: true });
+        const slug = sd.metadata?.slug || o.lines?.data?.[0]?.metadata?.slug;
         const end = (o.lines?.data?.[0]?.period?.end || 0) * 1000;
         if (slug && end) await extend(slug, end + GRACE, { plan: 'month' });
-        else { const room = await Room.findOne({ stripeSubscriptionId: o.subscription }); if (room && end) await extend(room.slug, end + GRACE, { plan: 'month' }); }
+        else { const room = await Room.findOne({ stripeSubscriptionId: subId }); if (room && end) await extend(room.slug, end + GRACE, { plan: 'month' }); }
       } else if (ev.type === 'customer.subscription.deleted') {
         const room = await Room.findOne({ stripeSubscriptionId: o.id });
         if (room) { room.stripeSubscriptionId = ''; await room.save(); log(`billing: ${room.slug} subscription ended; door closes ${room.paidThrough?.toISOString()}`); }
