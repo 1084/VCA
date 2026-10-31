@@ -532,3 +532,5 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .rent-btns{display:flex;gap:6px;flex-wrap:wrap}
 .rent-msg{margin:8px 0 2px;padding:10px 12px;border-radius:10px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);font-size:13.5px;display:flex;justify-content:space-between;gap:10px}
 .rent-msg .ghost{color:var(--muted)}
+.rent-msg.warn{background:rgba(255,92,92,.08);border-color:rgba(255,92,92,.3)}
+.rent-msg.warn .ghost{color:var(--text);text-decoration:underline}

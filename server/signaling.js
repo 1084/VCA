@@ -19,6 +19,12 @@ const nameOf = (user) => (user?.name || (user?.email || 'guest').split('@')[0]).
 // People a host has removed, per room, for as long as that host's session lasts:
 // a guest key id, or an account email. Cleared when the last host socket leaves.
 const removed = new Map(); // roomId -> Set<string>
+// People a host has let in, per room, for the same span: a guest whose phone
+// drops and reconnects (screen lock, switching apps) walks back in without
+// knocking again, instead of standing at the door while their screen still
+// shows the room. Cleared with `removed` when the host's session ends.
+const admitted = new Map(); // roomId -> Set<string>
+const isAdmitted = (roomId, s) => { const id = identity(s); return !!(id && admitted.get(roomId)?.has(id)); };
 const identity = (s) => (s.user?.guest ? `key:${s.user.jti || `${s.user.name}|${s.user.iat}`}` : s.user?.email ? `acct:${s.user.email}` : null);
 const isRemoved = (roomId, s) => { const id = identity(s); return !!(id && removed.get(roomId)?.has(id)); };
 
@@ -59,6 +65,7 @@ function attachSignaling(io, { maxRoomSize = 10, translate = null } = {}) {
       // Locked: knock. The host sees the knock; the guest waits outside.
       const hosts = hostSockets(named);
       if (!hosts.length) return socket.emit('denied', { reason: 'host-away', room: roomState(named, roomId) });
+      if (isAdmitted(roomId, socket)) { socket.emit('admitted'); return enter(roomId, named); } // already let in this session: a reconnect
       socket.data.knocking = roomId;
       socket.emit('knocking', { room: roomState(named, roomId) });
       hosts.forEach((h) => h.emit('knock', { id: socket.id, name: displayName() }));
@@ -72,7 +79,11 @@ function attachSignaling(io, { maxRoomSize = 10, translate = null } = {}) {
       const named = await Room.findOne({ slug: roomId }).lean().catch(() => null);
       if (!named || named.ownerEmail !== socket.user?.email) return;
       guest.data.knocking = null;
-      if (admit) { guest.emit('admitted'); enterAs(guest, roomId, named); } else guest.emit('denied', { reason: 'host-declined' });
+      if (admit) {
+        const who = identity(guest);
+        if (who) { if (!admitted.has(roomId)) admitted.set(roomId, new Set()); admitted.get(roomId).add(who); }
+        guest.emit('admitted'); enterAs(guest, roomId, named);
+      } else guest.emit('denied', { reason: 'host-declined' });
     };
     const enterAs = (g, roomId, named) => {
       const room = io.sockets.adapter.rooms.get(roomId);
@@ -117,7 +128,7 @@ function attachSignaling(io, { maxRoomSize = 10, translate = null } = {}) {
       // remember them for the rest of this host's session, and lock the door so
       // the same link doesn't walk straight back in
       const who = identity(target);
-      if (who) { if (!removed.has(roomId)) removed.set(roomId, new Set()); removed.get(roomId).add(who); }
+      if (who) { if (!removed.has(roomId)) removed.set(roomId, new Set()); removed.get(roomId).add(who); admitted.get(roomId)?.delete(who); }
       const wasLocked = !!named.locked;
       let after = named;
       if (!wasLocked) after = (await Room.findOneAndUpdate({ slug: roomId }, { locked: true }, { new: true }).lean().catch(() => null)) || { ...named, locked: true };
@@ -258,7 +269,7 @@ function attachSignaling(io, { maxRoomSize = 10, translate = null } = {}) {
         const named = await Room.findOne({ slug: roomId, ownerEmail: socket.user?.email }).lean().catch(() => null);
         if (named) setImmediate(() => {
           io.in(roomId).emit('room-state', roomState(named, roomId));
-          if (!hostSockets(named).some((h) => h.id !== socket.id)) removed.delete(roomId); // the removals end with the host's session
+          if (!hostSockets(named).some((h) => h.id !== socket.id)) { removed.delete(roomId); admitted.delete(roomId); } // the removals and admissions end with the host's session
         });
       }
       if (socket.data.knocking) {

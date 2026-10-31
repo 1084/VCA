@@ -90,7 +90,18 @@ rooms.set('ms-ortiz', { slug: 'ms-ortiz', name: 'Spanish with Ms. Ortiz', ownerE
   const k5P = once(host, 'knock'); g5.emit('join', 'ms-ortiz'); const k5 = await k5P;
   const d5P = once(g5, 'denied'); host.emit('deny', { id: k5.id }); const d5 = await d5P; assert.strictEqual(d5.reason, 'host-declined'); console.log('✓ declined knock');
 
-  [host, g2, g5].forEach((c) => c.disconnect()); io.close(); server.close();
+  // 9. a guest the host let in (g2, Jamie) drops and reconnects: back in without a knock
+  let knockAgain = false; const kw2 = () => { knockAgain = true; }; host.on('knock', kw2);
+  const g2tok = g2.io.opts.auth.token; g2.disconnect(); await new Promise((r) => setTimeout(r, 60));
+  const g2b = Client(url, { auth: { token: g2tok } }); await once(g2b, 'connect');
+  const adP = once(g2b, 'admitted'); const pe = once(g2b, 'peers'); g2b.emit('join', 'ms-ortiz'); await adP; await pe;
+  await new Promise((r) => setTimeout(r, 80)); assert.strictEqual(knockAgain, false); host.off('knock', kw2); console.log('✓ admitted guest reconnects without knocking');
+  // ...but not once removed: remove the reconnected Jamie, and the same key is refused
+  const rm2P = once(g2b, 'denied'); host.emit('remove', { id: g2b.id }); await rm2P;
+  const g2c = Client(url, { auth: { token: g2tok } }); await once(g2c, 'connect');
+  g2c.emit('join', 'ms-ortiz'); const d2c = await once(g2c, 'denied'); assert.strictEqual(d2c.reason, 'removed'); g2c.disconnect(); console.log('✓ removal wins over an earlier admission');
+
+  [host, g2b, g5].forEach((c) => c.disconnect()); io.close(); server.close();
   console.log('all door tests passed');
   process.exit(0);
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

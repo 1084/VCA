@@ -16,6 +16,7 @@ const Icon = {
   chat: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
   people: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   phone: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92V20a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3.09a2 2 0 0 1 2 1.72c.12.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 10"/></svg>,
+  pin: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3l6 6-3 1-4 4 1 5-3 1-4-4-5 5M3 21l5-5"/><path d="M9 8l7 7"/></svg>,
   more: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg>,
   send: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>,
   copy: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
@@ -672,7 +673,7 @@ export default function CallScreen({ session, call, onLeave }) {
           </button>
           {hasWall && (
             <button className={`ctl ${sheet === 'wall' ? 'active' : ''}`} onClick={() => setSheet(sheet === 'wall' ? null : 'wall')} aria-label="Wall">
-              <span style={{ fontSize: 18, lineHeight: '19px' }}>📌</span>{wallNew && <b className="count">•</b>}
+              {Icon.pin}{wallNew && <b className="count">•</b>}
             </button>
           )}
           <button className={`ctl ${sheet === 'more' ? 'active' : ''}`} onClick={() => setSheet(sheet === 'more' ? null : 'more')} aria-label="More">
@@ -908,7 +909,7 @@ export default function CallScreen({ session, call, onLeave }) {
         {hasWall && (
           <button className={`ctl ${panel === 'wall' ? 'active' : ''} ${wallNew ? 'nudge' : ''}`}
             onClick={() => setPanel(panel === 'wall' ? null : 'wall')} title="What this room remembers: videos, files, homework, messages">
-            <span style={{ fontSize: 18, lineHeight: '19px' }}>📌</span><span>Wall</span>
+            {Icon.pin}<span>Wall</span>
           </button>
         )}
         {isLang && (
