@@ -21,6 +21,7 @@ const created = { accounts: [], links: [], intents: [], items: [] };
 const stripe = {
   accounts: { create: async (p) => { created.accounts.push(p); return { id: 'acct_1' }; }, retrieve: async (id) => ({ id, charges_enabled: created.ready, payouts_enabled: created.ready }), createLoginLink: async () => ({ url: 'https://dash.stripe.test' }) },
   accountLinks: { create: async (p) => { created.links.push(p); return { url: 'https://onboard.stripe.test' }; } },
+  paymentMethodDomains: { create: async (p, o) => { created.domains = [p.domain_name, o.stripeAccount]; return { id: 'pmd_1' }; } },
   paymentIntents: { create: async (p, o) => { created.intents.push([p, o]); return { id: 'pi_' + created.intents.length, client_secret: 'cs_x' }; } },
   subscriptionItems: { create: async (p) => { created.items.push(p); return { id: 'si_1' }; } },
   webhooks: { constructEvent: (body, sig) => { if (sig !== 'good') throw new Error('bad sig'); return JSON.parse(body); } }
@@ -49,6 +50,7 @@ const emitted = []; const io = { sockets: { sockets: new Map([['h1', { data: { r
   r = await call(host, 'connect/onboard', 'POST'); assert.equal(r.body.url, 'https://onboard.stripe.test');
   assert.equal(created.accounts[0].type, 'express'); assert.ok(created.accounts[0].capabilities.card_payments); assert.equal(users['ortiz@example.com'].stripeAccountId, 'acct_1');
   assert.match(created.links[0].return_url, /payments=done/);
+  assert.deepEqual(created.domains, ['cove.test', 'acct_1'], 'Apple Pay domain registered on the tutor account');
   // second onboard call reuses the account
   await call(host, 'connect/onboard', 'POST'); assert.equal(created.accounts.length, 1);
   // Stripe says the account is ready → host + rooms flagged, payments line added to the lease
