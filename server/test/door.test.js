@@ -30,7 +30,7 @@ rooms.set('ms-ortiz', { slug: 'ms-ortiz', name: 'Spanish with Ms. Ortiz', ownerE
   const server = http.createServer();
   const io = new Server(server);
   io.use((s, next) => { try { s.user = jwt.verify(s.handshake.auth.token, SECRET); next(); } catch { next(new Error('Unauthorized')); } });
-  attachSignaling(io, { maxRoomSize: 10 });
+  const claims = []; attachSignaling(io, { maxRoomSize: 10, claimLesson: async (slug, pi, who) => { claims.push([slug, pi, who]); return pi === 'pi_paid' ? { amount: 3000 } : null; } });
   await new Promise((r) => server.listen(0, r));
   const url = `http://localhost:${server.address().port}`;
   const fs=require('fs'); const log=(m)=>fs.writeSync(1, m+'\n'); const console={log:(...a)=>log(a.join(' ')), error:(...a)=>log('ERR '+a.map(x=>x&&x.stack||x).join(' '))}; const connect = (claims) => new Promise((res, rej) => { const c = Client(url, { auth: { token: jwt.sign(claims, SECRET) } }); c._claims = claims; c.on('connect', () => res(c)); c.on('connect_error', rej); });
@@ -89,6 +89,14 @@ rooms.set('ms-ortiz', { slug: 'ms-ortiz', name: 'Spanish with Ms. Ortiz', ownerE
   const g5 = await connect({ guest: true, room: 'ms-ortiz', name: 'Sam' });
   const k5P = once(host, 'knock'); g5.emit('join', 'ms-ortiz'); const k5 = await k5P;
   const d5P = once(g5, 'denied'); host.emit('deny', { id: k5.id }); const d5 = await d5P; assert.strictEqual(d5.reason, 'host-declined'); console.log('✓ declined knock');
+
+  // 8b. a knock with a lesson payment carries the amount; a bogus or missing one carries 0
+  const g6 = await connect({ guest: true, room: 'ms-ortiz', name: 'Pat', jti: 'pat' });
+  const k6P = once(host, 'knock'); g6.emit('join', 'ms-ortiz', { paid: 'pi_paid' }); const k6 = await k6P;
+  assert.strictEqual(k6.paid, 3000); assert.deepStrictEqual(claims.at(-1), ['ms-ortiz', 'pi_paid', 'key:pat']); host.emit('deny', { id: k6.id }); await once(g6, 'denied'); g6.disconnect();
+  const g7 = await connect({ guest: true, room: 'ms-ortiz', name: 'Lee' });
+  const k7P = once(host, 'knock'); g7.emit('join', 'ms-ortiz', { paid: 'pi_nope' }); const k7 = await k7P; assert.strictEqual(k7.paid, 0); host.emit('deny', { id: k7.id }); await once(g7, 'denied'); g7.disconnect();
+  console.log('✓ a paid knock says so; an unpaid one does not');
 
   // 9. a guest the host let in (g2, Jamie) drops and reconnects: back in without a knock
   let knockAgain = false; const kw2 = () => { knockAgain = true; }; host.on('knock', kw2);

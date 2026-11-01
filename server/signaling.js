@@ -28,7 +28,7 @@ const isAdmitted = (roomId, s) => { const id = identity(s); return !!(id && admi
 const identity = (s) => (s.user?.guest ? `key:${s.user.jti || `${s.user.name}|${s.user.iat}`}` : s.user?.email ? `acct:${s.user.email}` : null);
 const isRemoved = (roomId, s) => { const id = identity(s); return !!(id && removed.get(roomId)?.has(id)); };
 
-function attachSignaling(io, { maxRoomSize = 10, translate = null } = {}) {
+function attachSignaling(io, { maxRoomSize = 10, translate = null, claimLesson = async () => null } = {}) {
   io.on('connection', (socket) => {
     const displayName = () => nameOf(socket.user);
     const isGuest = () => !!socket.user?.guest;
@@ -41,11 +41,12 @@ function attachSignaling(io, { maxRoomSize = 10, translate = null } = {}) {
       for (const id of set || []) if (io.sockets.sockets.get(id)?.user?.email === named.ownerEmail) hostPresent = true;
       return { slug: named.slug, name: named.name, theme: named.theme, locked: !!named.locked, tipLink: named.tipLink || '',
         payLink: named.payLink || '', payNote: named.payNote || '', translate: !!named.translate, hostName: (named.ownerEmail || '').split('@')[0], hostPresent,
-        studio: !!named.studio, wall: named.studio ? (named.wall || '') : '', welcome: named.studio ? (named.welcome || '') : '' };
+        studio: !!named.studio, wall: named.studio ? (named.wall || '') : '', welcome: named.studio ? (named.welcome || '') : '',
+        paymentsReady: !!named.paymentsReady, tipsOn: named.tipsOn !== false, lessonPrice: named.studio ? (named.lessonPrice || 0) : 0 };
     };
     const hostSockets = (named) => [...io.sockets.sockets.values()].filter((s) => s.user?.email === named.ownerEmail && s.data.roomId === named.slug);
 
-    socket.on('join', async (roomId) => {
+    socket.on('join', async (roomId, opts) => {
       if (typeof roomId !== 'string' || !ROOM_ID_PATTERN.test(roomId)) return;
       if (socket.data.roomId || socket.data.knocking) return; // one room per connection
       // a guest key opens exactly one room
@@ -67,8 +68,11 @@ function attachSignaling(io, { maxRoomSize = 10, translate = null } = {}) {
       if (!hosts.length) return socket.emit('denied', { reason: 'host-away', room: roomState(named, roomId) });
       if (isAdmitted(roomId, socket)) { socket.emit('admitted'); return enter(roomId, named); } // already let in this session: a reconnect
       socket.data.knocking = roomId;
+      // a lesson paid at the door: the knock says so (the payment itself was confirmed by Stripe's webhook)
+      let paid = null;
+      if (typeof opts?.paid === 'string' && /^pi_[A-Za-z0-9]+$/.test(opts.paid)) paid = await claimLesson(roomId, opts.paid, identity(socket)).catch(() => null);
       socket.emit('knocking', { room: roomState(named, roomId) });
-      hosts.forEach((h) => h.emit('knock', { id: socket.id, name: displayName() }));
+      hosts.forEach((h) => h.emit('knock', { id: socket.id, name: displayName(), paid: paid ? paid.amount : 0 }));
     });
 
     // Host answers a knock.

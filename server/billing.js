@@ -23,7 +23,7 @@
 const DAY = 86400000;
 const GRACE = 3 * DAY; // a renewal that fails keeps the door open this long while Stripe retries
 
-function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, prices, origin, log = console.log }) {
+function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, prices, origin, log = console.log, paymentsPrice = '' }) {
   const ready = !!(stripe && prices.month && prices.day);
   const PLANS = { month: 'month', studio: 'studio', day: 'day' };
   const planOfPrice = (priceId) => (priceId && priceId === prices.studio ? 'studio' : priceId && priceId === prices.month ? 'month' : null);
@@ -68,7 +68,11 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
       allow_promotion_codes: true
     };
     if (room.stripeCustomerId) params.customer = room.stripeCustomerId; else params.customer_email = req.user.email;
-    if (isLease(plan)) params.subscription_data = { metadata: { slug: room.slug } };
+    if (isLease(plan)) {
+      params.subscription_data = { metadata: { slug: room.slug } };
+      // a host who already takes payments carries the $3 / month payments line on the lease
+      if (paymentsPrice && (await User.findOne({ email: req.user.email }).lean())?.payoutsReady) params.line_items.push({ price: paymentsPrice, quantity: 1 });
+    }
     const session = await stripe.checkout.sessions.create(params);
     res.json({ url: session.url });
   });

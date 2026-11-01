@@ -48,6 +48,11 @@ const roomSchema = new mongoose.Schema({
   plan: { type: String, default: '' },         // 'month' | 'day' — last thing bought (billing.js)
   stripeCustomerId: { type: String, default: '' },
   stripeSubscriptionId: { type: String, default: '' },
+  paymentsItemId: { type: String, default: '' },   // the $3 payments line on the lease, once added
+  // payments between the host and their students (payments.js)
+  paymentsReady: { type: Boolean, default: false }, // mirrors the host's payoutsReady
+  tipsOn: { type: Boolean, default: true },
+  lessonPrice: { type: Number, default: 0 },        // cents; 0 = no price at the door (Studio)
   createdAt: { type: Date, default: Date.now },
   lastSessionAt: { type: Date, default: Date.now } // the host was last in the room; drives expiry
 });
@@ -136,6 +141,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
       payLink: cleanLink(req.body?.payLink),
       payNote: cleanText(req.body?.payNote, 80),
       translate: theme === 'language' && req.body?.translate === true,
+      tipsOn: req.body?.tipsOn !== false,
       studio: !!h.studio // the room's tier always follows the account's; saving re-syncs it
     };
     // Studio fields (kept on the record; the door shows them only while studio is on)
@@ -145,7 +151,8 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
         priceNote: cleanText(req.body?.priceNote, 120), education: cleanText(req.body?.education, 600),
         wall: WALLS.includes(req.body?.wall) ? req.body.wall : '', welcome: cleanText(req.body?.welcome, 160),
         avail: Array.isArray(req.body?.avail) ? req.body.avail.slice(0, 21).map((v) => (v ? 1 : 0)) : [], tz: cleanText(req.body?.tz, 40),
-        photo: cleanPhoto(req.body?.photo)
+        photo: cleanPhoto(req.body?.photo),
+        lessonPrice: Number.isInteger(req.body?.lessonPrice) && req.body.lessonPrice >= 0 && req.body.lessonPrice <= 50000 ? req.body.lessonPrice : 0
       });
     }
     const room = await Room.findOneAndUpdate({ slug }, doc, { upsert: true, new: true, setDefaultsOnInsert: true });
@@ -248,7 +255,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
 
 function publicRoom(r) {
   const base = { slug: r.slug, name: r.name, theme: r.theme, locked: !!r.locked, tipLink: r.tipLink || '', payLink: r.payLink || '', payNote: r.payNote || '', translate: !!r.translate,
-    hostName: (r.ownerEmail || '').split('@')[0], studio: !!r.studio };
+    hostName: (r.ownerEmail || '').split('@')[0], studio: !!r.studio, paymentsReady: !!r.paymentsReady, tipsOn: r.tipsOn !== false, lessonPrice: r.studio ? (r.lessonPrice || 0) : 0 };
   if (r.studio) Object.assign(base, { tagline: r.tagline || '', about: r.about || '', aboutLang: r.aboutLang || '', priceNote: r.priceNote || '', education: r.education || '',
     wall: r.wall || '', welcome: r.welcome || '', avail: r.avail || [], tz: r.tz || '', photo: r.photo || '' });
   return base;

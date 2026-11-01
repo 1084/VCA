@@ -49,6 +49,8 @@ app.use(cors({ origin: CLIENT_ORIGIN }));
 const { attachBilling, makeStripe } = require('./billing');
 let billingWebhook = (req, res) => res.status(503).end();
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), (req, res) => billingWebhook(req, res));
+let paymentsWebhook = (req, res) => res.status(503).end();
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), (req, res) => paymentsWebhook(req, res));
 app.use(express.json({ limit: '256kb' })); // room records carry a small avatar
 
 // Reject query operators smuggled in request bodies ({ email: { $gt: '' } }):
@@ -70,7 +72,10 @@ const userSchema = new mongoose.Schema({
   hostSince: Date,
   maxRooms: { type: Number, default: 1 },
   termsAcceptedAt: Date,
-  termsVersion: String
+  termsVersion: String,
+  // payments between the host and their students (payments.js): their own Stripe account
+  stripeAccountId: { type: String, default: '' },
+  payoutsReady: { type: Boolean, default: false }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -174,9 +179,17 @@ const billing = attachBilling(app, {
   stripe: makeStripe(process.env), requireAuth, Room: RoomModel, User,
   webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
   prices: { month: process.env.STRIPE_PRICE_MONTH || '', studio: process.env.STRIPE_PRICE_STUDIO || '', day: process.env.STRIPE_PRICE_DAY || '' },
-  origin: CLIENT_ORIGIN[0] || 'http://localhost:5173'
+  origin: CLIENT_ORIGIN[0] || 'http://localhost:5173', paymentsPrice: process.env.STRIPE_PRICE_PAYMENTS || ''
 });
 billingWebhook = billing.webhook;
+const { attachPayments } = require('./payments');
+const payments = attachPayments(app, io, {
+  stripe: makeStripe(process.env), requireAuth, Room: RoomModel, User, secret: SECRET,
+  origin: CLIENT_ORIGIN[0] || 'http://localhost:5173', publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+  connectWebhookSecret: process.env.STRIPE_CONNECT_WEBHOOK_SECRET || '', paymentsPrice: process.env.STRIPE_PRICE_PAYMENTS || ''
+});
+paymentsWebhook = payments.webhook;
+console.log(`payments: ${payments.ready ? 'ready' : 'not configured (STRIPE_PUBLISHABLE_KEY)'}`);
 console.log(`billing: ${billing.ready ? 'ready' : 'not configured (STRIPE_SECRET_KEY / STRIPE_PRICE_MONTH / STRIPE_PRICE_DAY)'}`);
 
 io.use((socket, next) => {
@@ -192,7 +205,7 @@ io.use((socket, next) => {
 
 // ---- Room signaling (mesh, up to MAX_ROOM_SIZE people) ----
 const { attachSignaling } = require('./signaling');
-attachSignaling(io, { maxRoomSize: Number(process.env.MAX_ROOM_SIZE) || 10, translate: translator });
+attachSignaling(io, { maxRoomSize: Number(process.env.MAX_ROOM_SIZE) || 10, translate: translator, claimLesson: (...a) => payments.claimLesson(...a) });
 
 // ---- Real-time collaboration (Yjs over WebSocket) ----
 // Socket.IO broadcasts are fine for WebRTC *signaling* (fire-and-forget
