@@ -104,7 +104,7 @@ $('#hosts').addEventListener('click', async (e) => {
   const email = b.closest('tr').dataset.email;
   try {
     if (b.dataset.h === 'revoke') { if (!confirm(`Revoke ${email}? Their rooms are deleted.`)) return; await api('hosts', { method: 'POST', body: JSON.stringify({ email, host: false }) }); }
-    else { const studio = b.textContent.includes('Studio'); await api('hosts', { method: 'POST', body: JSON.stringify({ email, studio })); }
+    else { const studio = b.textContent.includes('Studio'); await api('hosts', { method: 'POST', body: JSON.stringify({ email, studio }) }); }
     load();
   } catch (err) { alert(err.message); }
 });
