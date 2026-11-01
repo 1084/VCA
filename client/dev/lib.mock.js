@@ -6,6 +6,7 @@ const Q = new URLSearchParams(location.search);
 const ROOM = { slug: 'ms-ortiz', name: 'Spanish with Ms. Ortiz', theme: Q.get('lang') === '1' ? 'language' : 'tutoring', translate: Q.get('tr') === '1', locked: Q.get('open') !== '1', tipLink: 'https://paypal.me/ortiz', payLink: Q.get('pay') === '1' ? 'https://paypal.me/ortiz/15' : '', payNote: '$15 per session', hostName: Q.get('host') === '1' ? 'testuser' : 'ortiz' };
 const STUDIO = Q.get('studio') === '1' ? { studio: true, tagline: 'Alicia Ortiz · Cuernavaca, México · Spanish, chemistry', about: 'Hola, soy Alicia. Tengo una maestría en Química de Productos Naturales y cinco años enseñando español y química en privado. Mis clases son conversacionales primero; la gramática llega cuando la necesitas.', aboutLang: 'es-ES', priceNote: '$30 per 50-minute lesson · packs of 4 for $110', education: 'M.Sc. Natural Products Chemistry, UAEM, 2023\nB.Sc. Molecular Design, UAEM, 2022', wall: 'forest', welcome: '¡Bienvenido, {name}! Lesson 8 today: the preterite.', avail: [1,0,0, 1,1,0, 1,1,0, 1,1,1, 0,0,0, 0,0,0, 1,0,0], tz: 'America/New_York', photo: '' } : {};
 Object.assign(ROOM, STUDIO);
+if (Q.get('pay') === '1') Object.assign(ROOM, { paymentsReady: true, tipsOn: true, lessonPrice: Q.get('studio') === '1' ? 3000 : 0 });
 export const roomInfo = async () => ({ ...ROOM, hostPresent: Q.get('away') !== '1', count: 3, startedAt: Date.now() - 120000 });
 export const aboutTranslated = async () => ({ text: "Hi, I'm Alicia. I hold a master's in Natural Products Chemistry and have taught Spanish and chemistry privately for five years. Lessons are conversational first; grammar comes when you need it.", translated: true });
 export const WALLS = [['', 'Cove'], ['forest', 'Forest'], ['dusk', 'Dusk'], ['clay', 'Clay'], ['slate', 'Slate'], ['plum', 'Plum']];
@@ -61,3 +62,9 @@ export const putFile = (u, h, f, on) => new Promise((r) => { let k = 0; const t 
 export const billingStatus = async () => ({ ready: true, studioReady: true, prices: { month: 12, studio: 20, day: 2 }, rooms: [{ slug: 'ms-ortiz', comped: Q.get('rented') !== '1', paidThrough: Q.get('rented') === '1' ? new Date(Date.now() + 12 * 86400000) : null, plan: Q.get('rented') === '1' ? 'month' : '', open: true, subscription: Q.get('rented') === '1' }] });
 export const billingCheckout = async () => ({ url: 'about:blank' });
 export const billingPortal = async () => ({ url: 'about:blank' });
+export const payStart = async (t, s, kind, amount) => ({ clientSecret: 'mock', intentId: 'pi_mock', account: 'acct_mock', publishableKey: '', amount: kind === 'lesson' ? 3000 : amount, kind, to: 'ortiz' });
+export const payCheck = async () => ({ paid: true, kind: 'lesson', amount: 3000 });
+export const connectStatus = async () => ({ ready: true, hasAccount: Q.get('pay') !== '0', payoutsReady: Q.get('pay') === '1', feeNote: '$3 / month on your lease while payments are on', month: { tips: 1500, tipCount: 3, lessons: 9000, lessonCount: 3 } });
+export const connectOnboard = async () => ({ url: 'about:blank' });
+export const connectDashboard = async () => ({ url: 'about:blank' });
+export const dollars = (c) => `$${(c / 100).toFixed(c % 100 ? 2 : 0)}`;

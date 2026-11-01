@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { roomInfo, guestKey, initials, gradFor, aboutTranslated, WALL_CSS, DAYS } from './lib';
+import { roomInfo, guestKey, initials, gradFor, aboutTranslated, WALL_CSS, DAYS, payCheck, dollars } from './lib';
+import PaySheet from './PaySheet';
 
 /**
  * The door to a named room, for guests. No account: a name is enough.
@@ -12,6 +13,8 @@ export default function RoomEntry({ slug, onEnter, session }) {
   const [err, setErr] = useState('');
   const [name, setName] = useState(() => { try { return localStorage.getItem('cove-guest-name') || ''; } catch { return ''; } });
   const [busy, setBusy] = useState(false);
+  const [paying, setPaying] = useState(null);   // { token, name } while the lesson is being paid at the door
+  const [paidNote, setPaidNote] = useState('');
   const [about, setAbout] = useState(null); // { text, translated }
   const myLang = (navigator.language || 'en').slice(0, 2).toLowerCase();
   const toggleAbout = async () => {
@@ -22,14 +25,18 @@ export default function RoomEntry({ slug, onEnter, session }) {
   const refresh = () => roomInfo(slug).then((r) => { setRoom(r); setErr(''); }).catch((e) => setErr(e.message));
   useEffect(() => { refresh(); const t = setInterval(refresh, 10000); return () => clearInterval(t); }, [slug]);
 
-  const enter = async () => {
+  const priced = !!room?.studio && room?.lessonPrice > 0 && !!room?.paymentsReady && !session;
+  const alreadyPaid = () => { try { return sessionStorage.getItem(`cove-paid-${slug}`); } catch { return null; } };
+  const enter = async (key) => {
     setBusy(true); setErr('');
     try {
       let token = session?.token, email = session?.email;
       if (!token) {
-        const k = await guestKey(slug, name.trim());
+        const k = key || await guestKey(slug, name.trim());
         token = k.token; email = `${k.name}@guest`;
         try { localStorage.setItem('cove-guest-name', k.name); } catch { /* fine */ }
+        // a priced door: pay first (once per visit), then knock with the receipt
+        if (priced && !key && !alreadyPaid()) { setPaying({ token, name: k.name }); setBusy(false); return; }
       }
       let stream = null;
       try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { stream = null; }
@@ -37,6 +44,16 @@ export default function RoomEntry({ slug, onEnter, session }) {
     } catch (e) { setErr(e.message); setBusy(false); }
   };
 
+  const onPaid = async (intentId) => {
+    setPaidNote('Confirming with Stripe…');
+    for (let i = 0; i < 20; i++) {
+      try { const c = await payCheck(paying.token, slug, intentId); if (c.paid) break; } catch { /* keep waiting */ }
+      await new Promise((r) => setTimeout(r, 750));
+    }
+    try { sessionStorage.setItem(`cove-paid-${slug}`, intentId); } catch { /* fine */ }
+    const key = { token: paying.token, name: paying.name }; setPaying(null); setPaidNote('');
+    enter(key);
+  };
   const g = gradFor(room?.hostName || slug);
   const studio = !!room?.studio;
   const wall = studio ? WALL_CSS[room.wall] || '' : '';
@@ -44,6 +61,7 @@ export default function RoomEntry({ slug, onEnter, session }) {
   const today = (new Date().getDay() + 6) % 7;
   return (
     <section className={`screen door ${studio ? 'studio' : ''}`} style={wall ? { '--wall': wall } : undefined}>
+      {paying && <PaySheet slug={slug} token={paying.token} kind="lesson" to={room.hostName} onClose={() => { setPaying(null); setBusy(false); }} onPaid={onPaid} />}
       <div className="door-card">
         <div className="mark"><span className="dot" />Cove</div>
         {!room && !err && <p className="hint" style={{ marginTop: 18 }}>Finding the room…</p>}
@@ -69,8 +87,8 @@ export default function RoomEntry({ slug, onEnter, session }) {
                 <p>{about?.text || room.about}</p>
               </div>
             )}
-            {studio && room.priceNote && (
-              <div className="door-sec"><h4>Lessons</h4><p>{room.priceNote}</p></div>
+            {studio && (room.priceNote || room.lessonPrice > 0) && (
+              <div className="door-sec"><h4>Lessons</h4>{room.lessonPrice > 0 && <p><b>{dollars(room.lessonPrice)}</b> a lesson{room.paymentsReady ? ', paid at the door' : ''}</p>}{room.priceNote && <p>{room.priceNote}</p>}</div>
             )}
             {studio && room.avail?.some(Boolean) && (
               <div className="door-sec">
@@ -84,7 +102,7 @@ export default function RoomEntry({ slug, onEnter, session }) {
             {studio && room.education && (
               <div className="door-sec"><h4>Education</h4><p style={{ whiteSpace: 'pre-line' }}>{room.education}</p></div>
             )}
-            {room.payLink && (
+            {room.payLink && !priced && (
               <div className="door-pay">
                 <b>Pay the teacher</b>
                 <span>{(room.payNote || 'This room has a paid door').replace(/[.]?$/, '.')} Pay through {room.hostName}'s own link, then knock. Nothing is charged until {room.hostName} is in the room and lets you in.</span>
@@ -99,8 +117,8 @@ export default function RoomEntry({ slug, onEnter, session }) {
               </div>
             )}
             <p className="form-err">{err}</p>
-            <button className="btn btn-primary" disabled={busy || (!session && !name.trim())} onClick={enter}>
-              {busy ? '…' : room.locked ? (room.hostPresent ? 'Knock' : 'Wait at the door') : 'Enter the room'}
+            <button className="btn btn-primary" disabled={busy || (!session && !name.trim())} onClick={() => enter()}>
+              {busy ? '…' : paidNote ? paidNote : priced && !alreadyPaid() ? `Pay ${dollars(room.lessonPrice)} and ${room.locked ? 'knock' : 'enter'}` : room.locked ? (room.hostPresent ? 'Knock' : 'Wait at the door') : 'Enter the room'}
             </button>
             <p className="hint" style={{ marginTop: 14, fontSize: 12.5 }}>
               No download, no account. Your microphone will be asked for; the camera stays off until you turn it on inside.

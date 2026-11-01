@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { whoAmI, saveRoom, deleteRoom, roomUrl, WALLS, WALL_CSS, DAYS, SLOTS, billingStatus, billingCheckout, billingPortal } from './lib';
+import { whoAmI, saveRoom, deleteRoom, roomUrl, WALLS, WALL_CSS, DAYS, SLOTS, billingStatus, billingCheckout, billingPortal, connectStatus, connectOnboard, connectDashboard, dollars } from './lib';
 import { LANGS } from './useCaptions';
 
 const THEMES = [['plain', 'Plain room'], ['tutoring', 'Tutoring'], ['language', 'Language lesson'], ['meeting', 'Meeting'], ['study', 'Study hall'], ['family', 'Family']];
@@ -71,9 +71,16 @@ export default function MyRoom({ session, onOpen }) {
   const manage = async (slug) => { try { const { url } = await billingPortal(session.token, slug); location.assign(url); } catch (e) { setErr(e.message); } };
   const billOf = (slug) => bill?.rooms?.find((b) => b.slug === slug);
   const fmtDay = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  // ---- payments between me and my students (Stripe Connect) ----
+  const [pay, setPay] = useState(null);
+  const [payMsg, setPayMsg] = useState(() => { const q = new URLSearchParams(location.search).get('payments'); return q === 'done' ? 'Stripe has your details. Payments switch on as soon as Stripe finishes its checks, usually within minutes.' : q === 'again' ? 'That setup link expired. Tap Set up payments again.' : ''; });
+  const loadPay = () => connectStatus(session.token).then(setPay).catch(() => setPay(null));
+  useEffect(() => { loadPay(); if (location.search.includes('payments=')) history.replaceState(null, '', '/'); }, [session.token]);
+  const [payBusy, setPayBusy] = useState(false);
+  const goStripe = async (fn) => { setPayBusy(true); setErr(''); try { const { url } = await fn(session.token); location.assign(url); } catch (e) { setErr(e.message); setPayBusy(false); } };
   if (!me || !me.host) return null;
 
-  const blank = { slug: '', name: '', theme: 'tutoring', locked: true, tipLink: '', payLink: '', payNote: '', translate: false, tagline: '', about: '', aboutLang: 'en-US', priceNote: '', education: '', wall: '', welcome: '', avail: Array(21).fill(0), tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '', photo: '' };
+  const blank = { slug: '', name: '', theme: 'tutoring', locked: true, tipLink: '', payLink: '', payNote: '', translate: false, tagline: '', about: '', aboutLang: 'en-US', priceNote: '', lessonPrice: 0, tipsOn: true, education: '', wall: '', welcome: '', avail: Array(21).fill(0), tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '', photo: '' };
   const save = async () => {
     setBusy(true); setErr('');
     try { await saveRoom(session.token, { ...edit, acceptTerms: agree || !!me.termsAcceptedAt }); setEdit(null); await load(); }
@@ -121,6 +128,28 @@ export default function MyRoom({ session, onOpen }) {
         </div>
       ))}
       {billErr && <p className="rent-msg warn">Rent status: {billErr}. <button className="ghost" onClick={loadBill}>Retry</button></p>}
+      {pay?.ready && (
+        <div className="pay-card">
+          {pay.payoutsReady ? (
+            <>
+              <div><b>Payments on.</b> Students tip in the room{me.studio ? ' and pay the lesson price at the door' : ''}; it lands in your own Stripe account. {pay.feeNote && <span className="muted">{pay.feeNote}.</span>}</div>
+              <div className="muted">This month: {pay.month.tipCount} tip{pay.month.tipCount === 1 ? '' : 's'} ({dollars(pay.month.tips)}) · {pay.month.lessonCount} lesson{pay.month.lessonCount === 1 ? '' : 's'} ({dollars(pay.month.lessons)}), before Stripe's fee.</div>
+              <div className="row-btns"><button className="wb-btn" disabled={payBusy} onClick={() => goStripe(connectDashboard)}>Stripe dashboard</button></div>
+            </>
+          ) : pay.hasAccount ? (
+            <>
+              <div><b>Payments: almost.</b> Stripe is still checking your details, or needs one more thing from you.</div>
+              <div className="row-btns"><button className="wb-btn" disabled={payBusy} onClick={() => goStripe(connectOnboard)}>{payBusy ? 'Opening Stripe…' : 'Finish setup'}</button><button className="wb-btn" onClick={loadPay}>Check again</button></div>
+            </>
+          ) : (
+            <>
+              <div><b>Take tips and lesson payments in the room.</b> Students pay with Apple Pay, Google Pay or a card without leaving the page; the money goes to your own Stripe account, and Cove takes no cut. Stripe charges you its card fee (2.9% + 30¢){pay.feeNote ? `, and your lease carries ${pay.feeNote}` : ''}.</div>
+              <div className="row-btns"><button className="btn btn-primary" style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }} disabled={payBusy} onClick={() => goStripe(connectOnboard)}>{payBusy ? 'Opening Stripe…' : 'Set up payments'}</button></div>
+            </>
+          )}
+          {payMsg && <div className="muted">{payMsg} <button className="ghost" onClick={() => setPayMsg('')} aria-label="Dismiss">×</button></div>}
+        </div>
+      )}
       {rentMsg && <p className="rent-msg">{rentMsg} <button className="ghost" onClick={() => setRentMsg('')} aria-label="Dismiss">×</button></p>}
       {me.rooms.length === 0 && !edit && <p className="muted" style={{ fontSize: 13.5 }}>You're an invited host. Create your room to get a link you can give students.</p>}
       {edit && (
@@ -161,6 +190,15 @@ export default function MyRoom({ session, onOpen }) {
                 <textarea value={edit.about || ''} maxLength={1200} placeholder="Who you are, how you teach, who your lessons are for." onChange={(e) => set('about', e.target.value)} />
                 <div className="chips" style={{ marginTop: 6 }}>{LANGS.slice(0, 8).map(([code, label]) => <button key={code} className={`chip ${edit.aboutLang === code ? 'on' : ''}`} onClick={() => set('aboutLang', code)}>{label}</button>)}</div></div>
               <div className="field"><label>Lessons &amp; price, in your words</label><input value={edit.priceNote || ''} maxLength={120} placeholder="$30 per 50-minute lesson · packs of 4 for $110" onChange={(e) => set('priceNote', e.target.value)} /></div>
+              {pay?.payoutsReady && (
+                <div className="field"><label>Lesson price at the door (leave 0 for none)</label>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <span>$</span><input style={{ width: 100 }} inputMode="decimal" value={edit.lessonPrice ? (edit.lessonPrice / 100).toString() : ''} placeholder="0" onChange={(e) => set('lessonPrice', Math.min(50000, Math.round((Number(e.target.value.replace(/[^\d.]/g, '')) || 0) * 100)))} />
+                    <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><input type="checkbox" checked={edit.tipsOn !== false} onChange={(e) => set('tipsOn', e.target.checked)} /> Tips on in the room</label>
+                  </div>
+                  <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>With a price, students pay before they knock and the knock shows it. Without one, they just knock.</p>
+                </div>
+              )}
               <div className="field"><label>Room look</label>
                 <div className="swatches">{WALLS.map(([v, l]) => <button key={v} title={l} className={edit.wall === v ? 'on' : ''} style={{ background: WALL_CSS[v] || 'var(--ink)' }} onClick={() => set('wall', v)} />)}</div></div>
               <div className="field"><label>Welcome line — guests see it when they enter; {'{name}'} becomes their name</label><input value={edit.welcome || ''} maxLength={160} placeholder="¡Bienvenido, {name}! Lesson 8 today: the preterite." onChange={(e) => set('welcome', e.target.value)} /></div>

@@ -6,6 +6,8 @@ import { socket, initials, gradFor, STUN_ONLY, fetchIceServers } from './lib';
 import useMesh from './useMesh';
 import Notes, { useNotesDoc, appendLine, notesText } from './collab/Notes';
 import Wall from './Wall';
+import PaySheet from './PaySheet';
+import { dollars } from './lib';
 
 const Icon = {
   mic: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>,
@@ -241,7 +243,10 @@ export default function CallScreen({ session, call, onLeave }) {
     let alive = true; // don't connect if the user left before the credential arrived
     fetchIceServers(token).then((ice) => { if (!alive) return; iceRef.current = ice; socket.connect(); });
 
-    const onConnect = () => { socket.emit('join', roomId); sendState(); };
+    const onConnect = () => {
+      let paid = null; try { paid = sessionStorage.getItem(`cove-paid-${roomId}`); } catch { /* fine */ }
+      socket.emit('join', roomId, paid ? { paid } : undefined); sendState();
+    };
     const onPeers = (list) => list.forEach(({ id, name }) => mesh.ensure(id, name));
     const onJoined = ({ id, name }) => { mesh.ensure(id, name); sendState(); toast(`${name} joined`); };
     const onDesc = ({ from, description }) => mesh.onDescription(from, description);
@@ -281,15 +286,20 @@ export default function CallScreen({ session, call, onLeave }) {
     const onDenied = ({ reason, room: r } = {}) => { if (r) setRoom(r); setDeniedWhy(reason || ''); setDoor('denied'); };
     // Someone's at the door: two soft knocks at once, and a gentle chime 3 s
     // later if the host still hasn't answered. Hosts only; one sound per knock.
-    const onKnock = ({ id, name }) => setKnocks((k) => {
+    const onKnock = ({ id, name, paid }) => setKnocks((k) => {
       if (k.some((x) => x.id === id)) return k;
       if (isHostRef.current) {
         play('knock');
         chimeTimers.current[id] = setTimeout(() => { delete chimeTimers.current[id]; if (knocksRef.current.some((x) => x.id === id)) play('chime'); }, 3000);
       }
-      return [...k, { id, name }];
+      return [...k, { id, name, paid: paid || 0 }];
     });
     const onKnockGone = ({ id }) => setKnocks((k) => k.filter((x) => x.id !== id));
+    // a student paid the host (tip or lesson): a quiet line in chat, hosts only
+    const onPaid = ({ kind, amount, from }) => {
+      const text = `${from} ${kind === 'lesson' ? 'paid' : 'tipped'} ${dollars(amount)}`;
+      setMsgs((m) => [...m.slice(-199), { id: 'paid', from: 'Paid', text, ts: Date.now() }]); toast(text);
+    };
     const onReported = () => { setReportOpen(false); setReportText(''); toast('Report sent. A person will read it.'); };
     const onCaption = (c) => {
       if (c.final) { setInterim((m) => { const n = { ...m }; delete n[c.id]; return n; }); setCaptions((l) => [...l.slice(-39), c]); }
@@ -302,6 +312,7 @@ export default function CallScreen({ session, call, onLeave }) {
     socket.on('denied', onDenied);
     socket.on('knock', onKnock);
     socket.on('knock-gone', onKnockGone);
+    socket.on('paid', onPaid);
     socket.on('reported', onReported);
     socket.on('reaction', onReaction);
     socket.on('poll', onPoll);
@@ -330,6 +341,7 @@ export default function CallScreen({ session, call, onLeave }) {
       socket.off('denied', onDenied);
       socket.off('knock', onKnock);
       socket.off('knock-gone', onKnockGone);
+      socket.off('paid', onPaid);
       socket.off('reported', onReported);
       socket.off('caption', onCaption);
       socket.off('reaction', onReaction);
@@ -491,6 +503,9 @@ export default function CallScreen({ session, call, onLeave }) {
   const removePeer = (id) => { if (window.confirm('Remove this person? They can\'t come back in during this session, and the door will be locked.')) socket.emit('remove', { id }); };
   const sendReport = () => { if (reportText.trim()) socket.emit('report', { text: reportText.trim() }); };
   const tipLink = room?.tipLink || '';
+  // tips inside the room when the host takes payments; otherwise their own link, as before
+  const canTipHere = !!room?.paymentsReady && room?.tipsOn !== false && !isHost && !!session.guest;
+  const [paySheet, setPaySheet] = useState(false);
   const [savedCaps, setSavedCaps] = useState(() => new Set());
   const capKey = (c) => `${c.id}|${c.ts}`;
   const saveCaption = (c) => {
@@ -524,7 +539,7 @@ export default function CallScreen({ session, call, onLeave }) {
     <div className="caps chat-hist" ref={chatRef} aria-live="polite">
       {msgs.length === 0 && <div className="cap hint">No messages yet. Everyone in the room sees what you send here.</div>}
       {msgs.map((m, i) => (
-        <div key={`${m.ts || 0}-${i}`} className={`cap ${m.id === socket.id ? 'me' : ''} ${m.id === 'poll' ? 'pollmsg' : ''}`} style={{ cursor: 'default' }}>
+        <div key={`${m.ts || 0}-${i}`} className={`cap ${m.id === socket.id ? 'me' : ''} ${m.id === 'poll' ? 'pollmsg' : ''} ${m.id === 'paid' ? 'paidmsg' : ''}`} style={{ cursor: 'default' }}>
           <span className="who">{m.id === socket.id ? 'You' : m.from}</span>
           <span className="txt">{m.text}</span>
         </div>
@@ -611,11 +626,14 @@ export default function CallScreen({ session, call, onLeave }) {
       </div>
     </div>
   );
+  const paySheetEl = paySheet && room && (
+    <PaySheet slug={roomId} token={token} kind="tip" to={room.hostName} onToast={toast} onClose={() => setPaySheet(false)} onPaid={() => setPaySheet(false)} />
+  );
   const knockBanner = isHost && knocks.length > 0 && (
     <div className="knocks">
       {knocks.map((k) => (
         <div key={k.id} className="knock">
-          <span>✋ <b>{k.name}</b> is at the door</span>
+          <span>✋ <b>{k.name}</b> is at the door{k.paid > 0 && <span className="paid">· paid {dollars(k.paid)}</span>}</span>
           <button className="btn btn-primary" style={{ padding: '7px 14px', width: 'auto', fontSize: 13 }} onClick={() => admit(k.id)}>Let in</button>
           <button className="btn btn-ghost" style={{ padding: '7px 12px', fontSize: 13 }} onClick={() => deny(k.id)}>Not now</button>
         </div>
@@ -656,7 +674,7 @@ export default function CallScreen({ session, call, onLeave }) {
           </div>
           <span className="timer">{mm}:{ss} · {peerList.length + 1}/10</span>
         </div>
-        {knockBanner}
+        {knockBanner}{paySheetEl}
 
         <div className={`call-body ${wsOn ? 'ws' : ''}`}>
           <div className="stage">{tiles}</div>
@@ -779,7 +797,11 @@ export default function CallScreen({ session, call, onLeave }) {
                   <button className="row" onClick={() => { setSheet(null); downloadNotes(); }}>
                     {Icon.save}<span>Save notes to this device</span><small>.txt file</small>
                   </button>
-                  {tipLink && !isHost && (
+                  {canTipHere ? (
+                    <button className="row" onClick={() => { setSheet(null); setPaySheet(true); }}>
+                      <span style={{ fontSize: 18 }}>💛</span><span>Tip {room.hostName}</span><small>Apple Pay, Google Pay or card, right here; they keep all of it</small>
+                    </button>
+                  ) : tipLink && !isHost && (
                     <a className="row" href={tipLink} target="_blank" rel="noopener noreferrer" onClick={() => setSheet(null)}>
                       <span style={{ fontSize: 18 }}>💛</span><span>Tip {room.hostName}</span><small>Opens their own link; they keep all of it</small>
                     </a>
@@ -942,7 +964,11 @@ export default function CallScreen({ session, call, onLeave }) {
             <span style={{ fontSize: 18, lineHeight: '19px' }}>{room.locked ? '🔒' : '🔓'}</span><span>Door</span>
           </button>
         )}
-        {tipLink && !isHost && (
+        {canTipHere ? (
+          <button className="ctl" onClick={() => setPaySheet(true)} title={`Tip ${room.hostName}; it goes to their own account`}>
+            <span style={{ fontSize: 18, lineHeight: '19px' }}>💛</span><span>Tip</span>
+          </button>
+        ) : tipLink && !isHost && (
           <a className="ctl" href={tipLink} target="_blank" rel="noopener noreferrer" title={`Tip ${room.hostName} through their own link`}>
             <span style={{ fontSize: 18, lineHeight: '19px' }}>💛</span><span>Tip</span>
           </a>
@@ -967,7 +993,7 @@ export default function CallScreen({ session, call, onLeave }) {
         </div>
       )}
       {handQueue.length > 0 && <div className="queue-chip">✋ {handQueue.map(([, p]) => p.name).join(' → ')}</div>}
-      {knockBanner}{doorOverlay}{reportDialog}{langSheet}
+      {knockBanner}{doorOverlay}{reportDialog}{langSheet}{paySheetEl}
       {playBlocked && (
         <button className="unblock" onClick={unblockPlayback}>
           🔊 Tap to enable incoming audio &amp; video

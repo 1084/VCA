@@ -20,7 +20,7 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 if (q.get('lobby') === '1') root.render(<LobbyScreen session={{ token: 't', email: 'testuser@example.com' }} email="testuser@example.com" onJoin={() => alert('join')} onSignOut={() => alert('sign out')} />);
 else if (q.get('door') === '1') root.render(<RoomEntry slug="ms-ortiz" session={null} onEnter={() => alert('enter')} />);
 else root.render(
-  <CallScreen session={{ token: 't', email: 'testuser@example.com' }}
+  <CallScreen session={{ token: 't', email: 'testuser@example.com', guest: q.get('host') !== '1' && q.get('guest') !== '0' }}
     call={{ roomId: 'JYP-3467', stream, micOn: true, camOn: q.get('cam') === '1' }}
     onLeave={() => alert('left')} />
 );
