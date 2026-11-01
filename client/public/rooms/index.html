@@ -61,7 +61,7 @@
     .compare td.us{color:var(--text);font-weight:500}
     .compare .yes{color:var(--green)}
     .compare .no{color:#FFA3A3}
-    .pricing{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px;max-width:760px}
+    .pricing{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:28px}
     .price{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px}
     .price.hi{border-color:rgba(255,180,84,.45);background:linear-gradient(180deg,rgba(255,180,84,.08),transparent 60%),var(--surface)}
     .price .n{font-family:var(--display);font-weight:600;font-size:18px}
@@ -81,6 +81,18 @@
     details p{color:var(--muted);margin-top:10px;max-width:70ch}
     .apply{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:36px;display:grid;grid-template-columns:1.2fr 1fr;gap:32px;align-items:center;margin-top:28px}
     .apply h2{margin-bottom:8px}
+    .form{display:grid;gap:10px}
+    .form p{margin:0 0 4px;font-size:15px}
+    .form label{display:block;font-size:13px;color:var(--muted)}
+    .form input:not([type=radio]):not([type=checkbox]),.form textarea{display:block;width:100%;margin-top:4px;padding:10px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);font:inherit;font-size:15px}
+    .form input:focus,.form textarea:focus{outline:none;border-color:var(--amber)}
+    .tiers{display:flex;gap:8px}
+    .tiers label{flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);cursor:pointer}
+    .tiers label:has(input:checked){border-color:var(--amber)}
+    .tiers small{color:var(--muted);margin-left:auto}
+    .agree{display:flex!important;gap:8px;align-items:flex-start;font-size:13px}
+    .form-msg{min-height:1em;font-size:13.5px;color:var(--amber)}
+    .form-msg.ok{color:var(--green)}
     .apply ol{color:var(--muted);padding-left:20px;font-size:15px}
     .apply ol li{margin:6px 0}
     .apply .box{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:22px}
@@ -157,17 +169,29 @@
       <h2>Pricing</h2>
       <p class="lede">Rent, not commission. The room costs the same whether you teach two lessons or forty.</p>
       <div class="pricing">
-        <div class="price hi">
-          <div class="n">Monthly lease</div>
+        <div class="price">
+          <div class="n">Room</div>
           <div class="amt">$12<small> / month</small></div>
           <ul>
             <li>Your own room and link, up to 10 people</li>
+            <li>A lockable door; guests knock, you let them in</li>
             <li>Notes, polls and hand queue kept with the room</li>
-            <li>A front-door page: what you teach, how to book, your tip link</li>
-            <li>Personal onboarding, including moving your first students over</li>
+            <li>Your tip link and booking link on the door</li>
             <li>Cancel any time; no contract</li>
           </ul>
-          <a class="btn btn-primary" href="#apply">Apply for a room</a>
+          <a class="btn btn-ghost" href="#apply">Apply for a room</a>
+        </div>
+        <div class="price hi">
+          <div class="n">Studio</div>
+          <div class="amt">$20<small> / month</small></div>
+          <ul>
+            <li>Everything in Room</li>
+            <li>A front-door page in your words: photo, what you teach, availability, how to book</li>
+            <li>Walls that remember: short videos, files to review, homework with due dates</li>
+            <li>Students hand in work and leave notes; only your room sees them</li>
+            <li>Personal onboarding, including moving your first students over</li>
+          </ul>
+          <a class="btn btn-primary" href="#apply">Apply for a Studio</a>
         </div>
         <div class="price">
           <div class="n">Day pass</div>
@@ -177,11 +201,11 @@
             <li>Same room, same features, no time cap</li>
             <li>Nothing to cancel; it simply expires</li>
           </ul>
-          <a class="btn btn-ghost" href="#apply">Ask about a day pass</a>
+          <a class="btn btn-ghost" href="#apply">Apply for a day pass</a>
         </div>
       </div>
       <div class="math">
-        <b>The math, plainly.</b> A tutor teaching twenty $30 lessons a month pays a platform roughly $110–$200 in commission. The same month here costs $12, and every tip is yours. We can price it this way because we keep our overhead low and we're not built to take a cut of your work.
+        <b>The math, plainly.</b> A tutor teaching twenty $30 lessons a month pays a platform roughly $110–$200 in commission. The same month here costs $12, or $20 with a Studio, and every tip is yours. We can price it this way because we keep our overhead low and we're not built to take a cut of your work.
       </div>
     </section>
 
@@ -223,13 +247,45 @@
             <li>If it's a fit, your room is ready the same day. The first month is on us.</li>
           </ol>
         </div>
-        <div class="box">
-          <p>We're starting with a handful of tutors and small groups. If that's you, write to us and we'll reply personally.</p>
-          <a class="btn btn-primary" style="width:100%" href="mailto:support@johnhubert.llc?subject=Cove%20Rooms%20application&body=What%20I%20teach%3A%0AWhere%20I%20teach%20now%20(link)%3A%0AHow%20I%20bill%20students%3A%0AAnything%20else%3A">Email your application</a>
-        </div>
+        <form class="box form" id="apply-form" novalidate>
+          <p>We're starting with a handful of tutors and small groups. If that's you, tell us a little and we'll reply personally.</p>
+          <div class="tiers">
+            <label><input type="radio" name="tier" value="room" checked> <b>Room</b> <small>$12 / mo</small></label>
+            <label><input type="radio" name="tier" value="studio"> <b>Studio</b> <small>$20 / mo</small></label>
+          </div>
+          <label>Your name <input name="name" maxlength="80" autocomplete="name" required></label>
+          <label>Email <input name="email" type="email" maxlength="254" autocomplete="email" required></label>
+          <label>What you teach, or what the room is for <input name="teaches" maxlength="400" required placeholder="Spanish conversation, adult beginners"></label>
+          <label>Where you teach now <input name="where" maxlength="300" placeholder="A link to your profile, or a name"></label>
+          <label>How you bill students <input name="billing" maxlength="300" placeholder="Per lesson by PayPal; packs of four"></label>
+          <label>Anything else <textarea name="notes" maxlength="1200" rows="3"></textarea></label>
+          <input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+          <label class="agree"><input type="checkbox" name="agree"><span>I'm an adult and I've read the <a href="/rooms/conduct.html" target="_blank" rel="noopener">conduct rule</a> and the <a href="/rooms/privacy.html" target="_blank" rel="noopener">privacy policy</a>.</span></label>
+          <p class="form-msg" id="apply-msg" role="status"></p>
+          <button class="btn btn-primary" type="submit" style="width:100%">Send application</button>
+        </form>
       </div>
     </section>
 
+    <script>
+      // Applications go to the Cove server and are read by a person. Nothing else happens with them.
+      const API = 'https://vca-89mx.onrender.com';
+      const form = document.getElementById('apply-form'), msg = document.getElementById('apply-msg');
+      if (location.hash === '#apply') { const t = document.querySelector('input[name=tier]'); t && t.focus(); }
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const f = new FormData(form); const body = Object.fromEntries(f.entries()); body.agree = f.get('agree') === 'on';
+        msg.className = 'form-msg'; msg.textContent = 'Sending…';
+        const btn = form.querySelector('button'); btn.disabled = true;
+        try {
+          const r = await fetch(API + '/api/apply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || 'Something went wrong. Email support@johnhubert.llc and we will sort it out.');
+          form.querySelectorAll('input,textarea,button').forEach((el) => { el.disabled = true; });
+          msg.className = 'form-msg ok'; msg.textContent = 'Thank you. We read every application and reply by email, usually within a few days.';
+        } catch (err) { msg.textContent = err.message; btn.disabled = false; }
+      });
+    </script>
     <footer>
       <div class="row">
         <span>© 2026 John Hubert LLC · Virginia · <a href="https://johnhubert.llc/">johnhubert.llc</a></span>

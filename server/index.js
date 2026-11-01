@@ -108,7 +108,9 @@ app.post('/api/signup', authLimiter, async (req, res) => {
     const existing = await User.findOne({ email: v.email });
     if (existing) return res.status(409).json({ error: 'Email already exists' });
     const hash = await bcrypt.hash(v.password, 10);
-    await new User({ email: v.email, password: hash }).save();
+    // an invited applicant becomes a host the moment they sign up
+    const invited = await applications.isInvited(v.email);
+    await new User({ email: v.email, password: hash, ...(invited ? { host: true, hostSince: new Date() } : {}) }).save();
     res.json({ token: jwt.sign({ email: v.email }, SECRET, { expiresIn: TOKEN_TTL }) });
   } catch (err) {
     console.error('signup failed:', err.message);
@@ -149,6 +151,21 @@ const requireAuth = (req, res, next) => {
 const { attachRooms } = require('./rooms');
 const { makeTranslator } = require('./translate');
 const translator = makeTranslator(process.env);
+const { attachApplications } = require('./applications');
+const adminOnly = (req, res, next) => {
+  const key = process.env.ADMIN_KEY || '';
+  if (!key) return res.status(503).json({ error: 'ADMIN_KEY not configured' });
+  if (req.get('authorization') !== `Bearer ${key}`) return res.status(401).json({ error: 'Unauthorized' });
+  next();
+};
+const applications = attachApplications(app, { admin: adminOnly, authLimiter });
+// inviting an applicant who already has an account makes them a host at once
+app.locals.inviteNow = async (email) => {
+  const u = await User.findOne({ email });
+  if (!u) return false;
+  await User.updateOne({ email }, { host: true, ...(u.hostSince ? {} : { hostSince: new Date() }) });
+  return true;
+};
 const { attachWalls } = require('./walls');
 const { Room: RoomModel } = require('./rooms');
 const walls = attachWalls(app, io, { secret: SECRET, Room: RoomModel, authLimiter });
