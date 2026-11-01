@@ -240,3 +240,21 @@ front door never shows them. Files go straight from the browser to Cloudflare
 R2 by signed URL (`server/walls.js`). Render env: `R2_ACCOUNT_ID`,
 `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. Without them, link and
 text pins work and file pins answer 503.
+
+## Payments between a student and their tutor (Stripe Connect)
+
+Tips in the room and a lesson price at the door, on **direct charges** to the
+tutor's own Stripe Express account with a **zero application fee**: the tutor
+is the merchant, Stripe pays their bank and files their 1099-K, refunds and
+disputes are theirs. Cove holds the account id and a `Payment` record (room,
+amount, kind, time) — never a card or a student's name — and tells the host
+with a quiet line. The Connect cost is passed to the tutor as a $3 / month
+"Payments" line added to their lease once payments are on (`server/payments.js`).
+
+Render env: `STRIPE_PUBLISHABLE_KEY` (pk_), `STRIPE_CONNECT_WEBHOOK_SECRET`,
+`STRIPE_PRICE_PAYMENTS` ($3 recurring monthly). Stripe setup: enable Connect
+(Express accounts) in the Dashboard; a **second webhook endpoint** at
+`/api/payments/webhook` with "Listen to events on **connected** accounts" and
+the events `account.updated`, `payment_intent.succeeded`; turn on Link and
+Apple Pay / Google Pay under Settings → Payment methods (Apple Pay needs the
+domain `cove.johnhubert.llc` registered under Settings → Payment method domains).
