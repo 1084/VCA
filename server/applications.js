@@ -34,7 +34,7 @@ const ApplicationModel = mongoose.model('Application', applicationSchema);
 const cleanText = (v, n) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n) : '');
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-function attachApplications(app, { admin, authLimiter = (req, res, next) => next(), Application = ApplicationModel, log = console.log }) {
+function attachApplications(app, { admin, authLimiter = (req, res, next) => next(), Application = ApplicationModel, log = console.log, mail = null }) {
   // ---- public: send an application ----
   app.post('/api/apply', authLimiter, async (req, res) => {
     const b = req.body || {};
@@ -52,6 +52,7 @@ function attachApplications(app, { admin, authLimiter = (req, res, next) => next
     await Application.create({ name, email, tier, teaches, where, billing, notes });
     log(`apply: ${email} (${tier})`);
     res.json({ ok: true });
+    if (mail) { mail.applicationReceived({ name, email, tier }); mail.applicationNotice({ name, email, tier, teaches, where }); }
   });
 
   // ---- admin: review ----
@@ -69,9 +70,12 @@ function attachApplications(app, { admin, authLimiter = (req, res, next) => next
     a.status = status; a.decidedAt = status === 'new' ? null : new Date(); a.adminNote = cleanText(req.body?.note, 300);
     a.expiresAt = new Date(Date.now() + (status === 'declined' ? 90 : 365) * 86400000);
     await a.save();
-    let becameHost = false;
-    if (status === 'invited' && typeof app.locals.inviteNow === 'function') becameHost = await app.locals.inviteNow(a.email);
-    res.json({ ok: true, id: String(a._id), status, becameHost });
+    let becameHost = false, mailed = false;
+    if (status === 'invited') {
+      if (typeof app.locals.inviteNow === 'function') becameHost = await app.locals.inviteNow(a.email);
+      if (mail) mailed = (await mail.invited({ name: a.name, email: a.email, hasAccount: becameHost })).sent;
+    }
+    res.json({ ok: true, id: String(a._id), status, becameHost, mailed });
   });
   app.delete('/api/admin/applications/:id', admin, async (req, res) => {
     await Application.deleteOne({ _id: req.params.id }).catch(() => {});

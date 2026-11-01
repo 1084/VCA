@@ -258,3 +258,13 @@ Render env: `STRIPE_PUBLISHABLE_KEY` (pk_), `STRIPE_CONNECT_WEBHOOK_SECRET`,
 the events `account.updated`, `payment_intent.succeeded`; turn on Link and
 Apple Pay / Google Pay under Settings → Payment methods (Apple Pay needs the
 domain `cove.johnhubert.llc` registered under Settings → Payment method domains).
+
+## Email (Resend)
+
+Three messages, sent through Resend (`server/mail.js`): a confirmation to an
+applicant, a "new application" note to `MAIL_NOTIFY`, and the invitation when
+the owner presses Invite on /rooms/admin. Without `RESEND_API_KEY` they are
+logged, not sent. Env: `RESEND_API_KEY`, `MAIL_FROM` (default
+`Cove <hello@johnhubert.llc>`), `MAIL_NOTIFY` (default support@johnhubert.llc).
+Resend setup: add the domain johnhubert.llc, put its DKIM + SPF records in
+Cloudflare DNS, verify, create an API key with "sending" access.

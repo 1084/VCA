@@ -95,7 +95,7 @@ $('#list').addEventListener('click', async (e) => {
   try {
     if (b.dataset.do === 'delete') { if (!confirm('Delete this application for good?')) return; await api('applications/' + id, { method: 'DELETE' }); }
     else { const r = await api('applications/' + id + '/decide', { method: 'POST', body: JSON.stringify({ status: b.dataset.do, note }) });
-      if (b.dataset.do === 'invited') alert(r.becameHost ? 'They already have an account; they are a host now. Tell them to open the lobby.' : 'Invited. They become a host the moment they sign up with this email.'); }
+      if (b.dataset.do === 'invited') alert((r.becameHost ? 'They already have an account; they are a host now.' : 'Invited. They become a host the moment they sign up with this email.') + (r.mailed ? ' An invitation email has been sent.' : ' No email was sent (mail is not set up); let them know yourself.')); }
     load();
   } catch (err) { alert(err.message); }
 });

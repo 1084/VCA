@@ -163,7 +163,10 @@ const adminOnly = (req, res, next) => {
   if (req.get('authorization') !== `Bearer ${key}`) return res.status(401).json({ error: 'Unauthorized' });
   next();
 };
-const applications = attachApplications(app, { admin: adminOnly, authLimiter });
+const { makeMailer } = require('./mail');
+const mailer = makeMailer(process.env);
+console.log(`mail: ${process.env.RESEND_API_KEY ? 'ready' : 'not configured (RESEND_API_KEY); messages are logged'}`);
+const applications = attachApplications(app, { admin: adminOnly, authLimiter, mail: mailer });
 // inviting an applicant who already has an account makes them a host at once
 app.locals.inviteNow = async (email) => {
   const u = await User.findOne({ email });
