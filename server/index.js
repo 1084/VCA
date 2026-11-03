@@ -29,6 +29,14 @@ if (!MONGODB_URI) {
 }
 
 const app = express();
+// Every async route hands a rejection to the error handler (Express 4 doesn't on its own),
+// so a refused Stripe call answers the one request instead of hanging it or crashing the process.
+for (const m of ['get', 'post', 'put', 'delete']) {
+  const orig = app[m].bind(app);
+  app[m] = (path, ...handlers) => (typeof path === 'string' || path instanceof RegExp)
+    ? orig(path, ...handlers.map((f) => (typeof f === 'function' && f.length < 4 ? (req, res, next) => Promise.resolve(f(req, res, next)).catch(next) : f)))
+    : orig(path, ...handlers);
+}
 // Render/Heroku/most PaaS sit behind a reverse proxy; without this the
 // rate limiter would see the proxy's IP for everyone and throttle all
 // users as one. Harmless locally.
@@ -157,6 +165,9 @@ const requireAuth = (req, res, next) => {
     next();
   } catch { res.status(401).json({ error: 'Unauthorized' }); }
 };
+// A failed call inside a route (Stripe refusing a request, a dropped DB connection) must not
+// restart the whole server: log it, answer the one request with a 500, carry on.
+process.on('unhandledRejection', (e) => console.error('unhandled:', e?.message || e));
 const { attachRooms } = require('./rooms');
 const { makeTranslator } = require('./translate');
 const translator = makeTranslator(process.env);
@@ -283,4 +294,6 @@ server.on('upgrade', (req, socket, head) => {
   });
 });
 
+// last: one bad request answers with a 500 and a log line, nothing else is affected
+app.use((err, req, res, next) => { console.error('route error:', err?.message || err); if (res.headersSent) return next(err); res.status(500).json({ error: 'Something went wrong on our side. Try again in a moment.' }); });
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -66,7 +66,15 @@ function attachPayments(app, io, { stripe, requireAuth, Room, User, secret, orig
     let acct = u.stripeAccountId;
     try {
     if (!acct) {
-      const a = await stripe.accounts.create({ type: 'express', email, business_type: 'individual', capabilities: { card_payments: { requested: true }, transfers: { requested: true } }, metadata: { email } });
+      // The modern shape of an Express account: Stripe collects the identity details and carries
+      // losses, the tutor pays the processing fees, and gets Stripe's Express dashboard.
+      // (The legacy `type: 'express'` shorthand is refused for new platforms.)
+      const a = await stripe.accounts.create({
+        email, business_type: 'individual',
+        controller: { fees: { payer: 'account' }, losses: { payments: 'stripe' }, requirement_collection: 'stripe', stripe_dashboard: { type: 'express' } },
+        capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+        metadata: { email }
+      });
       acct = a.id; await User.updateOne({ email }, { stripeAccountId: acct });
       // Apple Pay on a direct charge needs the domain registered on the connected account itself
       try { await stripe.paymentMethodDomains.create({ domain_name: new URL(origin).hostname }, { stripeAccount: acct }); }

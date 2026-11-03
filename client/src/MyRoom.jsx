@@ -107,6 +107,7 @@ export default function MyRoom({ session, onOpen }) {
           <div>
             <b>{r.name}</b> <span className="muted">· {r.theme} · {r.locked ? 'door locked' : 'door open'}{r.expiresInDays <= 30 ? ` · unused ${r.idleDays} days — archived in ${r.expiresInDays}` : ''}</span>
             <div className="muted mono">{roomUrl(r.slug)}</div>
+            {pay?.ready && !pay.payoutsReady && !r.tipLink && <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>Students have no way to tip you yet: set up payments below, or add a tip link under Edit.</div>}
             {bill && billOf(r.slug) && (() => { const b = billOf(r.slug); return (
               <div className="rent">
                 <span className="muted">{b.comped ? 'Rent: on us.' : b.plan === 'trial' && b.open ? `First month on us, through ${fmtDay(b.paidThrough)}. Rent before then and the door stays open.` : b.open ? `${b.plan === 'studio' ? 'Studio' : b.plan === 'day' ? 'Day pass' : 'Room'} paid through ${fmtDay(b.paidThrough)}${b.subscription ? ' · renews monthly' : b.plan === 'day' ? '' : ' · not renewing'}.` : `Rent lapsed ${fmtDay(b.paidThrough)} — the door is closed until you rent.`}</span>
@@ -148,7 +149,7 @@ export default function MyRoom({ session, onOpen }) {
               <div className="row-btns"><button className="btn btn-primary" style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }} disabled={payBusy} onClick={() => goStripe(connectOnboard)}>{payBusy ? 'Opening Stripe…' : 'Set up payments'}</button></div>
             </>
           )}
-          {payErr && <div className="wall-err">{payErr}</div>}
+          {payErr && <div className="wall-err">{/^(Load failed|Failed to fetch|NetworkError)/.test(payErr) ? "Cove's server didn't answer. Try again in a moment." : payErr}</div>}
           {payMsg && <div className="muted">{payMsg} <button className="ghost" onClick={() => setPayMsg('')} aria-label="Dismiss">×</button></div>}
         </div>
       )}

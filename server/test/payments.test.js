@@ -48,7 +48,7 @@ const emitted = []; const io = { sockets: { sockets: new Map([['h1', { data: { r
   r = await call(jamie, 'r/ms-ortiz/pay', 'POST', { kind: 'tip', amount: 500 }); assert.equal(r.status, 409);
   // onboard: creates an Express account with card + transfers, returns Stripe's link
   r = await call(host, 'connect/onboard', 'POST'); assert.equal(r.body.url, 'https://onboard.stripe.test');
-  assert.equal(created.accounts[0].type, 'express'); assert.ok(created.accounts[0].capabilities.card_payments); assert.equal(users['ortiz@example.com'].stripeAccountId, 'acct_1');
+  assert.equal(created.accounts[0].type, undefined, 'no legacy type field'); assert.equal(created.accounts[0].controller.stripe_dashboard.type, 'express'); assert.equal(created.accounts[0].controller.fees.payer, 'account'); assert.equal(created.accounts[0].controller.losses.payments, 'stripe'); assert.ok(created.accounts[0].capabilities.card_payments); assert.equal(users['ortiz@example.com'].stripeAccountId, 'acct_1');
   assert.match(created.links[0].return_url, /payments=done/);
   assert.deepEqual(created.domains, ['cove.test', 'acct_1'], 'Apple Pay domain registered on the tutor account');
   // second onboard call reuses the account
