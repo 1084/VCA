@@ -50,7 +50,7 @@ footer a{color:var(--muted)}
 <div class="tabs"><button data-s="new" class="on">New</button><button data-s="invited">Invited</button><button data-s="declined">Declined</button><button data-s="">All</button></div>
 <div id="list"></div>
 <h2>Hosts</h2>
-<table class="hosts"><thead><tr><th>Email</th><th>Since</th><th>Tier</th><th>Rooms</th><th>Terms</th><th></th></tr></thead><tbody id="hosts"></tbody></table>
+<table class="hosts"><thead><tr><th>Email</th><th>Since</th><th>Tier</th><th>Rent</th><th>Payments</th><th>Terms</th><th></th></tr></thead><tbody id="hosts"></tbody></table>
 <script>
 const API = 'https://vca-89mx.onrender.com';
 const $ = (s) => document.querySelector(s);
@@ -81,7 +81,7 @@ async function load() {
         </div>
       </div>`).join('') : '<p style="color:var(--muted)">Nothing here.</p>';
     const hosts = await api('hosts');
-    $('#hosts').innerHTML = hosts.map((h) => `<tr data-email="${esc(h.email)}"><td>${esc(h.email)}</td><td>${h.hostSince ? new Date(h.hostSince).toLocaleDateString() : ''}</td><td>${h.studio ? 'Studio' : 'Room'}</td><td>${h.maxRooms || 1}</td><td>${h.termsAcceptedAt ? '✓' : '—'}</td><td><button class="btn" data-h="studio">${h.studio ? 'Make Room' : 'Make Studio'}</button> <button class="btn d" data-h="revoke">Revoke</button></td></tr>`).join('');
+    $('#hosts').innerHTML = hosts.map((h) => `<tr data-email="${esc(h.email)}"><td>${esc(h.email)}</td><td>${h.hostSince ? new Date(h.hostSince).toLocaleDateString() : ''}</td><td>${h.studio ? 'Studio' : 'Room'}</td><td>${h.comped ? 'Comped' : 'Trial, then rent'}</td><td>${h.payoutsReady ? 'On' : '—'}</td><td>${h.termsAcceptedAt ? '✓' : '—'}</td><td><button class="btn" data-h="studio">${h.studio ? 'Make Room' : 'Make Studio'}</button> <button class="btn" data-h="comp">${h.comped ? 'Charge rent' : 'Comp'}</button> <button class="btn d" data-h="revoke">Revoke</button></td></tr>`).join('');
     $('#status').textContent = `${apps.length} application${apps.length === 1 ? '' : 's'} · ${hosts.length} host${hosts.length === 1 ? '' : 's'}`;
   } catch (e) { $('#status').textContent = e.message === 'Unauthorized' ? 'That key was not accepted.' : e.message; }
 }
@@ -104,6 +104,7 @@ $('#hosts').addEventListener('click', async (e) => {
   const email = b.closest('tr').dataset.email;
   try {
     if (b.dataset.h === 'revoke') { if (!confirm(`Revoke ${email}? Their rooms are deleted.`)) return; await api('hosts', { method: 'POST', body: JSON.stringify({ email, host: false }) }); }
+    else if (b.dataset.h === 'comp') { const comped = b.textContent === 'Comp'; if (!confirm(comped ? `Waive rent for ${email}? Their doors stay open with no date.` : `Charge ${email} rent? A fresh 30-day trial starts now, then the door needs rent.`)) return; await api('hosts', { method: 'POST', body: JSON.stringify({ email, comped }) }); }
     else { const studio = b.textContent.includes('Studio'); await api('hosts', { method: 'POST', body: JSON.stringify({ email, studio }) }); }
     load();
   } catch (err) { alert(err.message); }

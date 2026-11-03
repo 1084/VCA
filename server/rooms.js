@@ -57,6 +57,7 @@ const roomSchema = new mongoose.Schema({
   lastSessionAt: { type: Date, default: Date.now } // the host was last in the room; drives expiry
 });
 const TERMS_VERSION = '2026-10-30';
+const TRIAL_DAYS = 30;   // an invited host's first month is on us; then the door needs rent (unless the admin comps them)
 const ROOM_IDLE_DAYS = 90;   // named room with no host session for this long is archived
 const NOTES_IDLE_DAYS = 30;  // plain-code room notes untouched for this long are deleted
 const Room = mongoose.model('Room', roomSchema);
@@ -77,7 +78,7 @@ const isHostEmail = (email) => hostEmails().includes(String(email || '').toLower
 const hostOf = async (User, email) => {
   const u = await User.findOne({ email }).lean();
   const host = !!(u?.host || isHostEmail(email));
-  return { user: u, host, maxRooms: u?.maxRooms || 1, termsAcceptedAt: u?.termsAcceptedAt || null, studio: !!u?.studio };
+  return { user: u, host, maxRooms: u?.maxRooms || 1, termsAcceptedAt: u?.termsAcceptedAt || null, studio: !!u?.studio, comped: !!u?.comped };
 };
 
 // Only http(s) links; the page opens them in a new tab. Nothing else.
@@ -155,6 +156,8 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
         lessonPrice: Number.isInteger(req.body?.lessonPrice) && req.body.lessonPrice >= 0 && req.body.lessonPrice <= 50000 ? req.body.lessonPrice : 0
       });
     }
+    // a brand-new room starts its trial clock unless the admin has comped this host
+    if (!existing && !h.comped) { doc.paidThrough = new Date(Date.now() + TRIAL_DAYS * 86400000); doc.plan = 'trial'; }
     const room = await Room.findOneAndUpdate({ slug }, doc, { upsert: true, new: true, setDefaultsOnInsert: true });
     res.json(publicRoom(room));
   });
@@ -211,7 +214,7 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
   });
   // invite or revoke a host: { email, host: true|false, maxRooms? }
   app.get('/api/admin/hosts', admin, async (req, res) => {
-    res.json(await User.find({ host: true }, { email: 1, hostSince: 1, maxRooms: 1, studio: 1, termsAcceptedAt: 1, termsVersion: 1 }).lean());
+    res.json(await User.find({ host: true }, { email: 1, hostSince: 1, maxRooms: 1, studio: 1, comped: 1, payoutsReady: 1, termsAcceptedAt: 1, termsVersion: 1 }).lean());
   });
   app.post('/api/admin/hosts', admin, async (req, res) => {
     const email = cleanText(req.body?.email, 254).toLowerCase();
@@ -222,12 +225,14 @@ function attachRooms(app, io, { secret, adminKey, requireAuth, User, WorkspaceDo
     const upd = { host, ...(host && !u.hostSince ? { hostSince: new Date() } : {}) };
     if (Number.isInteger(req.body?.maxRooms) && req.body.maxRooms >= 1 && req.body.maxRooms <= 10) upd.maxRooms = req.body.maxRooms;
     if (typeof req.body?.studio === 'boolean') { upd.studio = req.body.studio; await Room.updateMany({ ownerEmail: email }, { studio: req.body.studio }); }
+    // comped: rent waived; the rooms' doors stay open with no date. Un-comping starts a fresh trial month.
+    if (typeof req.body?.comped === 'boolean') { upd.comped = req.body.comped; await Room.updateMany({ ownerEmail: email, stripeSubscriptionId: '' }, req.body.comped ? { paidThrough: null, plan: '' } : { paidThrough: new Date(Date.now() + TRIAL_DAYS * 86400000), plan: 'trial' }); }
     await User.updateOne({ email }, upd);
     if (!host) {
       const rooms = await Room.find({ ownerEmail: email }).lean();
       for (const r of rooms) { await Room.deleteOne({ slug: r.slug }); await WorkspaceDoc.deleteOne({ name: `room-${r.slug}` }).catch(() => {}); }
     }
-    res.json({ ok: true, email, host, maxRooms: upd.maxRooms || u.maxRooms || 1, studio: typeof upd.studio === 'boolean' ? upd.studio : !!u.studio });
+    res.json({ ok: true, email, host, maxRooms: upd.maxRooms || u.maxRooms || 1, studio: typeof upd.studio === 'boolean' ? upd.studio : !!u.studio, comped: typeof upd.comped === 'boolean' ? upd.comped : !!u.comped });
   });
 
   // ---- expiry sweep: nothing lingers that nobody uses ----

@@ -212,6 +212,7 @@ export default function CallScreen({ session, call, onLeave }) {
     const release = () => {
       shareTrackRef.current?.stop();
       mesh.localStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+      try { socket.disconnect(); } catch { /* fine */ } // tell the server now, so no ghost tile lingers
     };
     window.addEventListener('pagehide', release);
     return () => window.removeEventListener('pagehide', release);

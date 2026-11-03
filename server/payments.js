@@ -64,6 +64,7 @@ function attachPayments(app, io, { stripe, requireAuth, Room, User, secret, orig
     const u = await User.findOne({ email }).lean();
     if (!u?.host) return res.status(403).json({ error: 'Hosts only.' });
     let acct = u.stripeAccountId;
+    try {
     if (!acct) {
       const a = await stripe.accounts.create({ type: 'express', email, business_type: 'individual', capabilities: { card_payments: { requested: true }, transfers: { requested: true } }, metadata: { email } });
       acct = a.id; await User.updateOne({ email }, { stripeAccountId: acct });
@@ -73,6 +74,11 @@ function attachPayments(app, io, { stripe, requireAuth, Room, User, secret, orig
     }
     const link = await stripe.accountLinks.create({ account: acct, type: 'account_onboarding', refresh_url: `${origin}/?payments=again`, return_url: `${origin}/?payments=done` });
     res.json({ url: link.url });
+    } catch (e) {
+      // Stripe's own words are the useful part ("sign up for Connect", a country mismatch, a missing capability)
+      log(`payments: onboarding failed for ${email}: ${e.message}`);
+      res.status(502).json({ error: `Stripe said: ${e.message}` });
+    }
   });
   app.post('/api/connect/dashboard', requireAuth, async (req, res) => {
     if (!ready) return notReady(res);

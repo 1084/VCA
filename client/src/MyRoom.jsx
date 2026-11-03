@@ -77,7 +77,8 @@ export default function MyRoom({ session, onOpen }) {
   const loadPay = () => connectStatus(session.token).then(setPay).catch(() => setPay(null));
   useEffect(() => { loadPay(); if (location.search.includes('payments=')) history.replaceState(null, '', '/'); }, [session.token]);
   const [payBusy, setPayBusy] = useState(false);
-  const goStripe = async (fn) => { setPayBusy(true); setErr(''); try { const { url } = await fn(session.token); location.assign(url); } catch (e) { setErr(e.message); setPayBusy(false); } };
+  const [payErr, setPayErr] = useState('');
+  const goStripe = async (fn) => { setPayBusy(true); setPayErr(''); try { const { url } = await fn(session.token); location.assign(url); } catch (e) { setPayErr(e.message); setPayBusy(false); } };
   if (!me || !me.host) return null;
 
   const blank = { slug: '', name: '', theme: 'tutoring', locked: true, tipLink: '', payLink: '', payNote: '', translate: false, tagline: '', about: '', aboutLang: 'en-US', priceNote: '', lessonPrice: 0, tipsOn: true, education: '', wall: '', welcome: '', avail: Array(21).fill(0), tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '', photo: '' };
@@ -108,7 +109,7 @@ export default function MyRoom({ session, onOpen }) {
             <div className="muted mono">{roomUrl(r.slug)}</div>
             {bill && billOf(r.slug) && (() => { const b = billOf(r.slug); return (
               <div className="rent">
-                <span className="muted">{b.comped ? 'Rent: on us for now.' : b.open ? `${b.plan === 'studio' ? 'Studio' : b.plan === 'day' ? 'Day pass' : 'Room'} paid through ${fmtDay(b.paidThrough)}${b.subscription ? ' · renews monthly' : b.plan === 'day' ? '' : ' · not renewing'}.` : `Rent lapsed ${fmtDay(b.paidThrough)} — the door is closed.`}</span>
+                <span className="muted">{b.comped ? 'Rent: on us.' : b.plan === 'trial' && b.open ? `First month on us, through ${fmtDay(b.paidThrough)}. Rent before then and the door stays open.` : b.open ? `${b.plan === 'studio' ? 'Studio' : b.plan === 'day' ? 'Day pass' : 'Room'} paid through ${fmtDay(b.paidThrough)}${b.subscription ? ' · renews monthly' : b.plan === 'day' ? '' : ' · not renewing'}.` : `Rent lapsed ${fmtDay(b.paidThrough)} — the door is closed until you rent.`}</span>
                 {bill.ready && (
                   <span className="rent-btns">
                     {!b.subscription && <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'month')}>{renting === `${r.slug}:month` ? 'Opening Stripe…' : `Room · $${bill.prices.month}/mo`}</button>}
@@ -147,6 +148,7 @@ export default function MyRoom({ session, onOpen }) {
               <div className="row-btns"><button className="btn btn-primary" style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }} disabled={payBusy} onClick={() => goStripe(connectOnboard)}>{payBusy ? 'Opening Stripe…' : 'Set up payments'}</button></div>
             </>
           )}
+          {payErr && <div className="wall-err">{payErr}</div>}
           {payMsg && <div className="muted">{payMsg} <button className="ghost" onClick={() => setPayMsg('')} aria-label="Dismiss">×</button></div>}
         </div>
       )}
@@ -229,7 +231,7 @@ export default function MyRoom({ session, onOpen }) {
             <div className="chips"><button className={`chip ${edit.locked ? 'on' : ''}`} onClick={() => set('locked', true)}>Locked: guests knock, you admit</button>
               <button className={`chip ${!edit.locked ? 'on' : ''}`} onClick={() => set('locked', false)}>Open: anyone with the link walks in</button></div></div>
           <div className="field"><label>Tip link (optional) — your own PayPal.me, Venmo, Ko-fi, Stripe link…</label><input value={edit.tipLink} placeholder="https://paypal.me/yourname" onChange={(e) => set('tipLink', e.target.value)} /></div>
-          <div className="field"><label>Paid door (optional) — your own payment link; guests pay there before you let them in</label><input value={edit.payLink} placeholder="https://…" onChange={(e) => set('payLink', e.target.value)} /></div>
+          <div className="field"><label>Paid door (optional) — your own payment link. Guests are asked to pay there before knocking; Cove can't check it, so it's on trust. For a price that is enforced before the knock, set up payments and (Studio) a lesson price.</label><input value={edit.payLink} placeholder="https://…" onChange={(e) => set('payLink', e.target.value)} /></div>
           {edit.payLink && <div className="field"><label>What it costs, in your words</label><input value={edit.payNote} maxLength={80} placeholder="$15 per session, or $50 for four" onChange={(e) => set('payNote', e.target.value)} /></div>}
           </>)}
           {!me.termsAcceptedAt && (

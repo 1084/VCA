@@ -41,7 +41,10 @@ const io = new Server(server, {
   cors: {
     origin: CLIENT_ORIGIN, // locked to the deployed client(s), never '*'
     methods: ['GET', 'POST']
-  }
+  },
+  // a tab that vanishes (closed, crashed, phone locked) is noticed in ~20 s, not ~45 s:
+  // its ghost tile and its seat in the room count go with it
+  pingInterval: 10000, pingTimeout: 10000
 });
 
 app.use(cors({ origin: CLIENT_ORIGIN }));
@@ -75,7 +78,8 @@ const userSchema = new mongoose.Schema({
   termsVersion: String,
   // payments between the host and their students (payments.js): their own Stripe account
   stripeAccountId: { type: String, default: '' },
-  payoutsReady: { type: Boolean, default: false }
+  payoutsReady: { type: Boolean, default: false },
+  comped: { type: Boolean, default: false }   // rent waived by the admin; otherwise a new room gets a 30-day trial, then rent is due
 });
 const User = mongoose.model('User', userSchema);
 
