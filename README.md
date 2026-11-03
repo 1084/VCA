@@ -244,7 +244,7 @@ text pins work and file pins answer 503.
 ## Payments between a student and their tutor (Stripe Connect)
 
 Tips in the room and a lesson price at the door, on **direct charges** to the
-tutor's own Stripe Express account with a **zero application fee**: the tutor
+tutor's own Stripe account (full dashboard; Stripe carries losses, the tutor pays fees) with a **zero application fee**: the tutor
 is the merchant, Stripe pays their bank and files their 1099-K, refunds and
 disputes are theirs. Cove holds the account id and a `Payment` record (room,
 amount, kind, time) — never a card or a student's name — and tells the host
@@ -253,7 +253,7 @@ with a quiet line. The Connect cost is passed to the tutor as a $3 / month
 
 Render env: `STRIPE_PUBLISHABLE_KEY` (pk_), `STRIPE_CONNECT_WEBHOOK_SECRET`,
 `STRIPE_PRICE_PAYMENTS` ($3 recurring monthly). Stripe setup: enable Connect
-(Express accounts) in the Dashboard; a **second webhook endpoint** at
+in the Dashboard; a **second webhook endpoint** at
 `/api/payments/webhook` with "Listen to events on **connected** accounts" and
 the events `account.updated`, `payment_intent.succeeded`; turn on Link and
 Apple Pay / Google Pay under Settings → Payment methods (Apple Pay needs the

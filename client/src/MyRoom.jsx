@@ -136,11 +136,11 @@ export default function MyRoom({ session, onOpen }) {
             <>
               <div><b>Payments on.</b> Students tip in the room{me.studio ? ' and pay the lesson price at the door' : ''}; it lands in your own Stripe account. {pay.feeNote && <span className="muted">{pay.feeNote}.</span>}</div>
               <div className="muted">This month: {pay.month.tipCount} tip{pay.month.tipCount === 1 ? '' : 's'} ({dollars(pay.month.tips)}) · {pay.month.lessonCount} lesson{pay.month.lessonCount === 1 ? '' : 's'} ({dollars(pay.month.lessons)}), before Stripe's fee.</div>
-              <div className="row-btns"><button className="wb-btn" disabled={payBusy} onClick={() => goStripe(connectDashboard)}>Stripe dashboard</button></div>
+              <div className="row-btns"><button className="wb-btn" disabled={payBusy} onClick={() => goStripe(connectDashboard)} title="Your own Stripe account: payments, payouts, refunds, tax forms">Stripe dashboard</button></div>
             </>
           ) : pay.hasAccount ? (
             <>
-              <div><b>Payments: almost.</b> Stripe is still checking your details, or needs one more thing from you.</div>
+              <div><b>Payments: almost.</b> Stripe is still checking your details, or needs one more thing from you (it may also email you to finish setting a Stripe password).</div>
               <div className="row-btns"><button className="wb-btn" disabled={payBusy} onClick={() => goStripe(connectOnboard)}>{payBusy ? 'Opening Stripe…' : 'Finish setup'}</button><button className="wb-btn" onClick={loadPay}>Check again</button></div>
             </>
           ) : (

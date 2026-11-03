@@ -66,12 +66,13 @@ function attachPayments(app, io, { stripe, requireAuth, Room, User, secret, orig
     let acct = u.stripeAccountId;
     try {
     if (!acct) {
-      // The modern shape of an Express account: Stripe collects the identity details and carries
-      // losses, the tutor pays the processing fees, and gets Stripe's Express dashboard.
-      // (The legacy `type: 'express'` shorthand is refused for new platforms.)
+      // The tutor's own full Stripe account: Stripe collects the identity details and carries
+      // losses, the tutor pays the processing fees and signs in at dashboard.stripe.com.
+      // (Stripe's lighter "Express" dashboard is only offered when the platform pays fees and
+      // carries losses, which is not Cove's model; the legacy `type` shorthand is refused.)
       const a = await stripe.accounts.create({
         email, business_type: 'individual',
-        controller: { fees: { payer: 'account' }, losses: { payments: 'stripe' }, requirement_collection: 'stripe', stripe_dashboard: { type: 'express' } },
+        controller: { fees: { payer: 'account' }, losses: { payments: 'stripe' }, requirement_collection: 'stripe', stripe_dashboard: { type: 'full' } },
         capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
         metadata: { email }
       });
@@ -92,8 +93,8 @@ function attachPayments(app, io, { stripe, requireAuth, Room, User, secret, orig
     if (!ready) return notReady(res);
     const acct = await accountOf(req.user.email);
     if (!acct) return res.status(404).json({ error: 'No payments account yet.' });
-    const l = await stripe.accounts.createLoginLink(acct);
-    res.json({ url: l.url });
+    // a full-dashboard account signs in at Stripe itself (login links exist only for Express)
+    res.json({ url: 'https://dashboard.stripe.com/' });
   });
 
   // ---- student: pay a tip or the lesson price, inside the room ----
