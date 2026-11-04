@@ -64,16 +64,17 @@ export default function MyRoom({ session, onOpen }) {
     const t = setTimeout(loadBill, 2500); return () => clearTimeout(t);
   }, [rentMsg, bill]);
   const [renting, setRenting] = useState('');
+  const [rentErr, setRentErr] = useState('');
   const rent = async (slug, plan) => {
-    setRenting(`${slug}:${plan}`); setErr('');
-    try { const { url } = await billingCheckout(session.token, slug, plan); location.assign(url); } catch (e) { setErr(e.message); setRenting(''); }
+    setRenting(`${slug}:${plan}`); setRentErr('');
+    try { const { url } = await billingCheckout(session.token, slug, plan); location.assign(url); } catch (e) { setRentErr(e.message); setRenting(''); }
   };
   const upgrade = async (slug) => {
-    setRenting(`${slug}:up`); setErr('');
+    setRenting(`${slug}:up`); setRentErr('');
     try { const r = await billingUpgrade(session.token, slug); if (r.url) location.assign(r.url); else { setRenting(''); setRentMsg('Your room is a Studio now.'); await load(); loadBill(); } }
-    catch (e) { setErr(e.message); setRenting(''); }
+    catch (e) { setRentErr(e.message); setRenting(''); }
   };
-  const manage = async (slug) => { try { const { url } = await billingPortal(session.token, slug); location.assign(url); } catch (e) { setErr(e.message); } };
+  const manage = async (slug) => { setRentErr(''); try { const { url } = await billingPortal(session.token, slug); location.assign(url); } catch (e) { setRentErr(e.message); } };
   const billOf = (slug) => bill?.rooms?.find((b) => b.slug === slug);
   const fmtDay = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   // ---- payments between me and my students (Stripe Connect) ----
@@ -159,6 +160,7 @@ export default function MyRoom({ session, onOpen }) {
           {payMsg && <div className="muted">{payMsg} <button className="ghost" onClick={() => setPayMsg('')} aria-label="Dismiss">×</button></div>}
         </div>
       )}
+      {rentErr && <p className="rent-msg warn">{rentErr} <button className="ghost" onClick={() => setRentErr('')} aria-label="Dismiss">×</button></p>}
       {rentMsg && <p className="rent-msg">{rentMsg} <button className="ghost" onClick={() => setRentMsg('')} aria-label="Dismiss">×</button></p>}
       {me.rooms.length === 0 && !edit && <p className="muted" style={{ fontSize: 13.5 }}>You're an invited host. Create your room to get a link you can give students.</p>}
       {edit && (
