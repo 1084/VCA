@@ -52,7 +52,7 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
   });
 
   // Start Checkout. The browser follows the returned URL to Stripe.
-  app.post('/api/billing/checkout', requireAuth, async (req, res) => {
+  const checkout = async (req, res) => {
     if (!ready) return notReady(res);
     const room = await ownRoom(req, res); if (!room) return;
     const plan = PLANS[req.body?.plan] || 'month';
@@ -75,7 +75,8 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
     }
     const session = await stripe.checkout.sessions.create(params);
     res.json({ url: session.url });
-  });
+  };
+  app.post('/api/billing/checkout', requireAuth, checkout);
 
   // Stripe's customer portal: change card, cancel, see invoices.
   app.post('/api/billing/portal', requireAuth, async (req, res) => {
@@ -84,6 +85,33 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
     if (!room.stripeCustomerId) return res.status(404).json({ error: 'Nothing to manage yet.' });
     const s = await stripe.billingPortal.sessions.create({ customer: room.stripeCustomerId, return_url: `${origin}/` });
     res.json({ url: s.url });
+  });
+
+  // Upgrade to Studio: any host may, no approval. How depends on how they pay.
+  //   lease     → Stripe's portal, straight to the plan switch (tier follows the next invoice)
+  //   comped    → the tier simply switches; nothing to pay
+  //   otherwise → Checkout for the Studio lease
+  app.post('/api/billing/upgrade', requireAuth, async (req, res) => {
+    const room = await ownRoom(req, res); if (!room) return;
+    if (room.studio) return res.status(409).json({ error: 'This room is already a Studio.' });
+    const u = await User.findOne({ email: req.user.email }).lean();
+    if (u?.comped) {
+      room.studio = true; room.plan = 'studio'; await room.save();
+      await User.updateOne({ email: req.user.email }, { studio: true });
+      log(`billing: ${room.slug} upgraded to Studio (comped)`);
+      return res.json({ done: true });
+    }
+    if (!ready || !prices.studio) return res.status(503).json({ error: 'Studio leases are not set up yet.' });
+    if (room.stripeSubscriptionId && room.stripeCustomerId) {
+      const s = await stripe.billingPortal.sessions.create({
+        customer: room.stripeCustomerId, return_url: `${origin}/?rent=paid`,
+        flow_data: { type: 'subscription_update', subscription_update: { subscription: room.stripeSubscriptionId } }
+      });
+      return res.json({ url: s.url });
+    }
+    // no lease yet: rent Studio
+    req.body = { slug: room.slug, plan: 'studio' };
+    return checkout(req, res);
   });
 
   // Webhook: the only place paidThrough moves. Raw body; signature checked.

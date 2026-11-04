@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { whoAmI, saveRoom, deleteRoom, roomUrl, WALLS, WALL_CSS, DAYS, SLOTS, billingStatus, billingCheckout, billingPortal, connectStatus, connectOnboard, connectDashboard, dollars } from './lib';
+import { whoAmI, saveRoom, deleteRoom, roomUrl, WALLS, WALL_CSS, DAYS, SLOTS, billingStatus, billingCheckout, billingPortal, billingUpgrade, connectStatus, connectOnboard, connectDashboard, dollars } from './lib';
 import { LANGS } from './useCaptions';
 
 const THEMES = [['plain', 'Plain room'], ['tutoring', 'Tutoring'], ['language', 'Language lesson'], ['meeting', 'Meeting'], ['study', 'Study hall'], ['family', 'Family']];
@@ -68,6 +68,11 @@ export default function MyRoom({ session, onOpen }) {
     setRenting(`${slug}:${plan}`); setErr('');
     try { const { url } = await billingCheckout(session.token, slug, plan); location.assign(url); } catch (e) { setErr(e.message); setRenting(''); }
   };
+  const upgrade = async (slug) => {
+    setRenting(`${slug}:up`); setErr('');
+    try { const r = await billingUpgrade(session.token, slug); if (r.url) location.assign(r.url); else { setRenting(''); setRentMsg('Your room is a Studio now.'); await load(); loadBill(); } }
+    catch (e) { setErr(e.message); setRenting(''); }
+  };
   const manage = async (slug) => { try { const { url } = await billingPortal(session.token, slug); location.assign(url); } catch (e) { setErr(e.message); } };
   const billOf = (slug) => bill?.rooms?.find((b) => b.slug === slug);
   const fmtDay = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -114,7 +119,8 @@ export default function MyRoom({ session, onOpen }) {
                 {bill.ready && (
                   <span className="rent-btns">
                     {!b.subscription && <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'month')}>{renting === `${r.slug}:month` ? 'Opening Stripe…' : `Room · $${bill.prices.month}/mo`}</button>}
-                    {!b.subscription && bill.studioReady && <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'studio')}>{renting === `${r.slug}:studio` ? 'Opening Stripe…' : `Studio · $${bill.prices.studio}/mo`}</button>}
+                    {!b.subscription && bill.studioReady && !r.studio && <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'studio')}>{renting === `${r.slug}:studio` ? 'Opening Stripe…' : `Studio · $${bill.prices.studio}/mo`}</button>}
+                    {!r.studio && (b.subscription || b.comped) && <button className="wb-btn" disabled={!!renting} onClick={() => upgrade(r.slug)} title={b.comped ? 'Front-door page, lesson price at the door, and the Wall' : `Switch your lease to Studio ($${bill.prices.studio}/mo): front-door page, lesson price at the door, and the Wall`}>{renting === `${r.slug}:up` ? 'Opening…' : b.comped ? 'Upgrade to Studio' : `Upgrade to Studio · $${bill.prices.studio}/mo`}</button>}
                     <button className="wb-btn" disabled={!!renting} onClick={() => rent(r.slug, 'day')}>{renting === `${r.slug}:day` ? 'Opening Stripe…' : `Day pass · $${bill.prices.day}`}</button>
                     {b.subscription && <button className="wb-btn" onClick={() => manage(r.slug)} title="Change plan, card, or cancel">Billing</button>}
                   </span>

@@ -12,7 +12,7 @@ const rooms = new Map();
 const mk = (r) => { const o = { paidThrough: null, plan: '', stripeCustomerId: '', stripeSubscriptionId: '', ...r, save: async function () { } }; rooms.set(o.slug, o); return o; };
 mk({ slug: 'ms-ortiz', ownerEmail: 'ortiz@example.com', studio: false });
 const users = { 'ortiz@example.com': { studio: false } };
-const User = { updateOne: async (f, u) => { Object.assign(users[f.email] ||= {}, u); } };
+const User = { updateOne: async (f, u) => { Object.assign(users[f.email] ||= {}, u); }, findOne: (f) => { const u = users[f.email] || null; const p = Promise.resolve(u); p.lean = async () => u; return p; } };
 const find = (f) => [...rooms.values()].find((r) => Object.entries(f).every(([k, v]) => r[k] === v)) || null;
 const Room = { findOne: async (f) => find(f), find: (f) => ({ lean: async () => [...rooms.values()].filter((r) => r.ownerEmail === f.ownerEmail) }) };
 const created = [];
@@ -102,6 +102,18 @@ const requireAuth = (req, res, next) => { try { req.user = jwt.verify((req.get('
   // portal
   assert.equal((await post('portal', { slug: 'ms-ortiz' })).body.url, 'https://portal.stripe.test');
 
+  // upgrade to Studio, three ways
+  stripe.billingPortal.sessions.create = async (p) => { created.portal = p; return { url: 'https://portal.stripe.test/up' }; };
+  // a) on a lease → the portal's plan-switch flow
+  room.studio = false; room.stripeSubscriptionId = 'sub_1'; room.stripeCustomerId = 'cus_1';
+  r = await post('upgrade', { slug: 'ms-ortiz' }); assert.equal(r.body.url, 'https://portal.stripe.test/up'); assert.equal(created.portal.flow_data.subscription_update.subscription, 'sub_1');
+  // b) no lease → Checkout for Studio
+  room.stripeSubscriptionId = '';
+  r = await post('upgrade', { slug: 'ms-ortiz' }); assert.equal(created.at(-1).line_items[0].price, 'price_s');
+  // c) comped → switches at once
+  users['ortiz@example.com'].comped = true;
+  r = await post('upgrade', { slug: 'ms-ortiz' }); assert.equal(r.body.done, true); assert.equal(room.studio, true); assert.equal(users['ortiz@example.com'].studio, true);
+  assert.equal((await post('upgrade', { slug: 'ms-ortiz' })).status, 409, 'already a Studio');
   // unconfigured: 503, never a crash
   const app2 = express(); app2.use(express.json());
   attachBilling(app2, { stripe: null, requireAuth, Room, User, webhookSecret: '', prices: { month: '', day: '' }, origin: 'x', log });

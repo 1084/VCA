@@ -86,6 +86,7 @@ export const putFile = (url, headers, file, onProgress) => new Promise((resolve,
 export const billingStatus = (token) => api('billing/status', { token });
 export const billingCheckout = (token, slug, plan) => api('billing/checkout', { method: 'POST', token, body: { slug, plan } });
 export const billingPortal = (token, slug) => api('billing/portal', { method: 'POST', token, body: { slug } });
+export const billingUpgrade = (token, slug) => api('billing/upgrade', { method: 'POST', token, body: { slug } });
 // ---- Payments between student and tutor (Stripe Connect; see server/payments.js) ----
 export const payStart = (token, slug, kind, amount) => api(`r/${encodeURIComponent(slug)}/pay`, { method: 'POST', token, body: { kind, amount } });
 export const payCheck = (token, slug, intentId) => api(`r/${encodeURIComponent(slug)}/pay/${encodeURIComponent(intentId)}`, { token });

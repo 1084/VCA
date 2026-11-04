@@ -62,6 +62,7 @@ export const putFile = (u, h, f, on) => new Promise((r) => { let k = 0; const t 
 export const billingStatus = async () => ({ ready: true, studioReady: true, prices: { month: 12, studio: 20, day: 2 }, rooms: [{ slug: 'ms-ortiz', comped: Q.get('rented') !== '1', paidThrough: Q.get('rented') === '1' ? new Date(Date.now() + 12 * 86400000) : null, plan: Q.get('rented') === '1' ? 'month' : '', open: true, subscription: Q.get('rented') === '1' }] });
 export const billingCheckout = async () => ({ url: 'about:blank' });
 export const billingPortal = async () => ({ url: 'about:blank' });
+export const billingUpgrade = async () => ({ url: 'about:blank' });
 export const payStart = async (t, s, kind, amount) => ({ clientSecret: 'mock', intentId: 'pi_mock', account: 'acct_mock', publishableKey: '', amount: kind === 'lesson' ? 3000 : amount, kind, to: 'ortiz' });
 export const payCheck = async () => ({ paid: true, kind: 'lesson', amount: 3000 });
 export const connectStatus = async () => ({ ready: true, hasAccount: Q.get('pay') !== '0', payoutsReady: Q.get('pay') === '1', feeNote: '$3 / month on your lease while payments are on', month: { tips: 1500, tipCount: 3, lessons: 9000, lessonCount: 3 } });
