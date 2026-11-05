@@ -82,7 +82,8 @@ const requireAuth = (req, res, next) => { try { req.user = jwt.verify((req.get('
   // tier follows the money: still Room after a Room lease
   assert.equal(room.studio, false); assert.equal(users['ortiz@example.com'].studio, false);
   // a switch to Studio in the portal → subscription.updated with the studio price → Studio on at once
-  await event('customer.subscription.updated', { id: 'sub_1', items: { data: [{ price: { id: 'price_s' } }] } });
+  // (the $3 payments add-on is the first item, as on a real lease with payments on)
+  await event('customer.subscription.updated', { id: 'sub_1', items: { data: [{ price: { id: 'price_pay' } }, { price: { id: 'price_s' } }] } });
   assert.equal(room.studio, true); assert.equal(room.plan, 'studio'); assert.equal(users['ortiz@example.com'].studio, true);
   // the next invoice carries the studio price and keeps it
   await event('invoice.paid', { parent: { subscription_details: { subscription: 'sub_1', metadata: { slug: 'ms-ortiz' } } }, lines: { data: [{ period: { end: end3 + 86400 }, pricing: { price_details: { price: 'price_s' } } }] } });
@@ -106,7 +107,7 @@ const requireAuth = (req, res, next) => { try { req.user = jwt.verify((req.get('
   stripe.billingPortal.sessions.create = async (p) => { created.portal = p; return { url: 'https://portal.stripe.test/up' }; };
   // a) on a lease → the portal's plan-switch flow
   room.studio = false; room.stripeSubscriptionId = 'sub_1'; room.stripeCustomerId = 'cus_1';
-  r = await post('upgrade', { slug: 'ms-ortiz' }); assert.equal(r.body.url, 'https://portal.stripe.test/up'); assert.equal(created.portal.flow_data.subscription_update.subscription, 'sub_1');
+  r = await post('upgrade', { slug: 'ms-ortiz' }); assert.equal(r.body.url, 'https://portal.stripe.test/up'); assert.equal(created.portal.flow_data.subscription_update.subscription, 'sub_1'); assert.match(created.portal.flow_data.after_completion.redirect.return_url, /upgrade=done/);
   // b) no lease → Checkout for Studio
   room.stripeSubscriptionId = '';
   r = await post('upgrade', { slug: 'ms-ortiz' }); assert.equal(created.at(-1).line_items[0].price, 'price_s');

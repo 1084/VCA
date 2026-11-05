@@ -52,16 +52,21 @@ export default function MyRoom({ session, onOpen }) {
 
   // ---- rent: what each room is paid through, and the two things for sale ----
   const [bill, setBill] = useState(null);
-  const [rentMsg, setRentMsg] = useState(() => { const q = new URLSearchParams(location.search).get('rent'); return q === 'paid' ? 'Thank you — the rent is in.' : q === 'cancelled' ? 'No charge was made.' : ''; });
+  const [rentMsg, setRentMsg] = useState(() => { const p = new URLSearchParams(location.search); const q = p.get('rent'); return p.get('upgrade') === 'done' ? 'Your room is becoming a Studio…' : q === 'paid' ? 'Thank you — the rent is in.' : q === 'cancelled' ? 'No charge was made.' : ''; });
   const [billErr, setBillErr] = useState('');
   const loadBill = () => billingStatus(session.token).then((b) => { setBill(b); setBillErr(''); }).catch((e) => { setBill(null); setBillErr(e.message || 'Could not load rent status'); });
-  useEffect(() => { loadBill(); if (location.search.includes('rent=')) history.replaceState(null, '', '/'); }, [session.token, me?.rooms?.length]);
-  // after a payment, poll briefly until the webhook has landed, then drop the thank-you
+  useEffect(() => { loadBill(); if (/rent=|upgrade=/.test(location.search)) history.replaceState(null, '', '/'); }, [session.token, me?.rooms?.length]);
+  // after a payment or an upgrade, poll briefly until Stripe's webhook has landed, then settle the message
   useEffect(() => {
-    if (rentMsg !== 'Thank you — the rent is in.') return;
-    const paid = bill?.rooms?.some((b) => !b.comped && b.open);
-    if (paid) { const t = setTimeout(() => setRentMsg(''), 4000); return () => clearTimeout(t); }
-    const t = setTimeout(loadBill, 2500); return () => clearTimeout(t);
+    if (rentMsg === 'Thank you — the rent is in.') {
+      const paid = bill?.rooms?.some((b) => !b.comped && b.open);
+      if (paid) { const t = setTimeout(() => setRentMsg(''), 4000); return () => clearTimeout(t); }
+      const t = setTimeout(loadBill, 2500); return () => clearTimeout(t);
+    }
+    if (rentMsg === 'Your room is becoming a Studio…') {
+      if (bill?.rooms?.some((b) => b.studio)) { setRentMsg('Your room is a Studio now: a front-door page, a lesson price at the door, and the Wall. Edit the room to set them up.'); load(); return; }
+      const t = setTimeout(loadBill, 2500); return () => clearTimeout(t);
+    }
   }, [rentMsg, bill]);
   const [renting, setRenting] = useState('');
   const [rentErr, setRentErr] = useState('');

@@ -27,6 +27,8 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
   const ready = !!(stripe && prices.month && prices.day);
   const PLANS = { month: 'month', studio: 'studio', day: 'day' };
   const planOfPrice = (priceId) => (priceId && priceId === prices.studio ? 'studio' : priceId && priceId === prices.month ? 'month' : null);
+  // the lease among a subscription's items (the $3 payments add-on sits beside it)
+  const planOfItems = (items) => { for (const it of items || []) { const p = planOfPrice(it.price?.id || it.pricing?.price_details?.price); if (p) return p; } return null; };
   const isLease = (plan) => plan === 'month' || plan === 'studio';
   // The tier follows what was paid for. Only called from webhook events.
   const setTier = async (room, plan) => {
@@ -63,7 +65,7 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
       line_items: [{ price: prices[plan], quantity: 1 }],
       client_reference_id: room.slug,
       metadata: { slug: room.slug, email: req.user.email, plan },
-      success_url: `${origin}/?rent=paid&room=${encodeURIComponent(room.slug)}`,
+      success_url: `${origin}/?${req.query?.upgrade ? 'upgrade=done' : 'rent=paid'}&room=${encodeURIComponent(room.slug)}`,
       cancel_url: `${origin}/?rent=cancelled`,
       allow_promotion_codes: true
     };
@@ -104,13 +106,13 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
     if (!ready || !prices.studio) return res.status(503).json({ error: 'Studio leases are not set up yet.' });
     if (room.stripeSubscriptionId && room.stripeCustomerId) {
       const s = await stripe.billingPortal.sessions.create({
-        customer: room.stripeCustomerId, return_url: `${origin}/?rent=paid`,
-        flow_data: { type: 'subscription_update', subscription_update: { subscription: room.stripeSubscriptionId } }
+        customer: room.stripeCustomerId, return_url: `${origin}/?upgrade=done`,
+        flow_data: { type: 'subscription_update', subscription_update: { subscription: room.stripeSubscriptionId }, after_completion: { type: 'redirect', redirect: { return_url: `${origin}/?upgrade=done` } } }
       });
       return res.json({ url: s.url });
     }
     // no lease yet: rent Studio
-    req.body = { slug: room.slug, plan: 'studio' };
+    req.body = { slug: room.slug, plan: 'studio' }; req.query = { ...(req.query || {}), upgrade: '1' };
     return checkout(req, res);
   });
 
@@ -153,18 +155,17 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
         const sd = o.parent?.subscription_details || o.subscription_details || {};
         const subId = o.subscription || sd.subscription || o.lines?.data?.[0]?.parent?.subscription_item_details?.subscription || '';
         if (!subId) return res.json({ received: true });
-        const line = o.lines?.data?.[0] || {};
-        const slug = sd.metadata?.slug || line.metadata?.slug;
-        const end = (line.period?.end || 0) * 1000;
-        // which lease was paid: the line's price tells us (handles a plan switch made in the portal)
-        const priceId = line.pricing?.price_details?.price || line.price?.id || '';
-        const plan = planOfPrice(priceId) || 'month';
+        const lines = o.lines?.data || []; const line = lines[0] || {};
+        const slug = sd.metadata?.slug || lines.map((l) => l.metadata?.slug).find(Boolean);
+        const end = Math.max(0, ...lines.map((l) => (l.period?.end || 0) * 1000));
+        // which lease was paid: scan the lines for a lease price (the payments add-on is a line too)
+        const plan = planOfItems(lines) || 'month';
         if (slug && end) await extend(slug, end + GRACE, { plan });
         else { const room = await Room.findOne({ stripeSubscriptionId: subId }); if (room && end) await extend(room.slug, end + GRACE, { plan }); }
       } else if (ev.type === 'customer.subscription.updated') {
         // a plan switch in the portal: the tier follows the new price right away
         const room = await Room.findOne({ stripeSubscriptionId: o.id });
-        const plan = planOfPrice(o.items?.data?.[0]?.price?.id);
+        const plan = planOfItems(o.items?.data);
         if (room && plan && room.plan !== plan) { room.plan = plan; await room.save(); await setTier(room, plan); }
       } else if (ev.type === 'customer.subscription.deleted') {
         const room = await Room.findOne({ stripeSubscriptionId: o.id });
