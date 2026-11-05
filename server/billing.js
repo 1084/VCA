@@ -45,8 +45,25 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
     return room;
   };
 
-  // What the lobby needs to show the Rent card.
+  // Ask Stripe what each lease is on right now, and make the tier match. Used when a host
+  // comes back from the portal (a switch may already have happened, so no event is coming).
+  const syncLeases = async (email) => {
+    if (!stripe) return;
+    const rooms = await Room.find({ ownerEmail: email });
+    for (const room of rooms) {
+      if (!room.stripeSubscriptionId) continue;
+      try {
+        const sub = await stripe.subscriptions.retrieve(room.stripeSubscriptionId);
+        const plan = planOfItems(sub.items?.data);
+        if (plan && room.plan !== plan) { room.plan = plan; await room.save(); await setTier(room, plan); }
+        else if (plan && (room.studio !== (plan === 'studio'))) await setTier(room, plan);
+      } catch (e) { log(`billing: sync ${room.slug}: ${e.message}`); }
+    }
+  };
+
+  // What the lobby needs to show the Rent card. ?sync=1 asks Stripe first.
   app.get('/api/billing/status', requireAuth, async (req, res) => {
+    if (req.query.sync === '1') await syncLeases(req.user.email);
     const rooms = await Room.find({ ownerEmail: req.user.email }).lean();
     res.json({ ready, studioReady: ready && !!prices.studio, prices: { month: 12, studio: 20, day: 2 }, rooms: rooms.map((r) => ({
       slug: r.slug, comped: !r.paidThrough, paidThrough: r.paidThrough, plan: r.plan || '', studio: !!r.studio, open: !r.paidThrough || r.paidThrough.getTime() > Date.now(), subscription: !!r.stripeSubscriptionId

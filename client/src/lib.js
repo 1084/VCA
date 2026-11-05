@@ -83,7 +83,7 @@ export const putFile = (url, headers, file, onProgress) => new Promise((resolve,
   x.send(file);
 });
 // ---- Billing (rent for the room; Stripe hosted Checkout) ----
-export const billingStatus = (token) => api('billing/status', { token });
+export const billingStatus = (token, sync = false) => api(`billing/status${sync ? '?sync=1' : ''}`, { token });
 export const billingCheckout = (token, slug, plan) => api('billing/checkout', { method: 'POST', token, body: { slug, plan } });
 export const billingPortal = (token, slug) => api('billing/portal', { method: 'POST', token, body: { slug } });
 export const billingUpgrade = (token, slug) => api('billing/upgrade', { method: 'POST', token, body: { slug } });

@@ -54,8 +54,8 @@ export default function MyRoom({ session, onOpen }) {
   const [bill, setBill] = useState(null);
   const [rentMsg, setRentMsg] = useState(() => { const p = new URLSearchParams(location.search); const q = p.get('rent'); return p.get('upgrade') === 'done' ? 'Your room is becoming a Studio…' : q === 'paid' ? 'Thank you — the rent is in.' : q === 'cancelled' ? 'No charge was made.' : ''; });
   const [billErr, setBillErr] = useState('');
-  const loadBill = () => billingStatus(session.token).then((b) => { setBill(b); setBillErr(''); }).catch((e) => { setBill(null); setBillErr(e.message || 'Could not load rent status'); });
-  useEffect(() => { loadBill(); if (/rent=|upgrade=/.test(location.search)) history.replaceState(null, '', '/'); }, [session.token, me?.rooms?.length]);
+  const loadBill = (sync = false) => billingStatus(session.token, sync).then((b) => { setBill(b); setBillErr(''); }).catch((e) => { setBill(null); setBillErr(e.message || 'Could not load rent status'); });
+  useEffect(() => { loadBill(/upgrade=|rent=/.test(location.search)); if (/rent=|upgrade=/.test(location.search)) history.replaceState(null, '', '/'); }, [session.token, me?.rooms?.length]);
   // after a payment or an upgrade, poll briefly until Stripe's webhook has landed, then settle the message
   useEffect(() => {
     if (rentMsg === 'Thank you — the rent is in.') {
@@ -65,7 +65,7 @@ export default function MyRoom({ session, onOpen }) {
     }
     if (rentMsg === 'Your room is becoming a Studio…') {
       if (bill?.rooms?.some((b) => b.studio)) { setRentMsg('Your room is a Studio now: a front-door page, a lesson price at the door, and the Wall. Edit the room to set them up.'); load(); return; }
-      const t = setTimeout(loadBill, 2500); return () => clearTimeout(t);
+      const t = setTimeout(() => loadBill(true), 2500); return () => clearTimeout(t);
     }
   }, [rentMsg, bill]);
   const [renting, setRenting] = useState('');

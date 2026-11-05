@@ -14,7 +14,7 @@ mk({ slug: 'ms-ortiz', ownerEmail: 'ortiz@example.com', studio: false });
 const users = { 'ortiz@example.com': { studio: false } };
 const User = { updateOne: async (f, u) => { Object.assign(users[f.email] ||= {}, u); }, findOne: (f) => { const u = users[f.email] || null; const p = Promise.resolve(u); p.lean = async () => u; return p; } };
 const find = (f) => [...rooms.values()].find((r) => Object.entries(f).every(([k, v]) => r[k] === v)) || null;
-const Room = { findOne: async (f) => find(f), find: (f) => ({ lean: async () => [...rooms.values()].filter((r) => r.ownerEmail === f.ownerEmail) }) };
+const Room = { findOne: async (f) => find(f), find: (f) => { const list = [...rooms.values()].filter((r) => r.ownerEmail === f.ownerEmail); const p = Promise.resolve(list); p.lean = async () => list; return p; } };
 const created = [];
 const stripe = {
   checkout: { sessions: { create: async (p) => { created.push(p); return { url: 'https://checkout.stripe.test/s' }; } } },
@@ -115,6 +115,11 @@ const requireAuth = (req, res, next) => { try { req.user = jwt.verify((req.get('
   users['ortiz@example.com'].comped = true;
   r = await post('upgrade', { slug: 'ms-ortiz' }); assert.equal(r.body.done, true); assert.equal(room.studio, true); assert.equal(users['ortiz@example.com'].studio, true);
   assert.equal((await post('upgrade', { slug: 'ms-ortiz' })).status, 409, 'already a Studio');
+  // sync: Stripe says the lease is Studio although no event ever arrived → tier set on status?sync=1
+  users['ortiz@example.com'].comped = false; room.studio = false; room.plan = 'month'; room.stripeSubscriptionId = 'sub_1';
+  stripe.subscriptions.retrieve = async () => ({ id: 'sub_1', items: { data: [{ price: { id: 'price_pay' } }, { price: { id: 'price_s' } }] } });
+  s = await (await fetch(`${base}/status?sync=1`, { headers: { authorization: `Bearer ${tok}` } })).json();
+  assert.equal(room.studio, true); assert.equal(room.plan, 'studio'); assert.equal(s.rooms[0].studio, true);
   // unconfigured: 503, never a crash
   const app2 = express(); app2.use(express.json());
   attachBilling(app2, { stripe: null, requireAuth, Room, User, webhookSecret: '', prices: { month: '', day: '' }, origin: 'x', log });
