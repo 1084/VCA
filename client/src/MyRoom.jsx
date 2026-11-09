@@ -47,7 +47,7 @@ export default function MyRoom({ session, onOpen }) {
   };
   const cropStyle = () => { const { sx, sy, side } = cropBox(crop); const k = 240 / side; return { width: crop.img.width * k, height: crop.img.height * k, marginLeft: -sx * k, marginTop: -sy * k }; };
 
-  const load = () => whoAmI(session.token).then(setMe).catch(() => setMe({ host: false, rooms: [] }));
+  const load = () => whoAmI(session.token).then(setMe).catch((e) => { if (/^Unauthorized$|\(401\)/.test(e.message || '')) { try { sessionStorage.removeItem('cove.session'); } catch {} location.replace('/'); } else setMe({ host: false, rooms: [] }); });
   useEffect(() => { load(); }, [session.token]);
 
   // ---- rent: what each room is paid through, and the two things for sale ----
@@ -55,7 +55,16 @@ export default function MyRoom({ session, onOpen }) {
   const [rentMsg, setRentMsg] = useState(() => { const p = new URLSearchParams(location.search); const q = p.get('rent'); return p.get('upgrade') === 'done' ? 'Your room is becoming a Studio…' : q === 'paid' ? 'Thank you — the rent is in.' : q === 'cancelled' ? 'No charge was made.' : ''; });
   const [billErr, setBillErr] = useState('');
   const loadBill = (sync = false) => billingStatus(session.token, sync).then((b) => { setBill(b); setBillErr(''); }).catch((e) => { setBill(null); setBillErr(e.message || 'Could not load rent status'); });
-  useEffect(() => { loadBill(/upgrade=|rent=/.test(location.search)); if (/rent=|upgrade=/.test(location.search)) history.replaceState(null, '', '/'); }, [session.token, me?.rooms?.length]);
+  useEffect(() => { loadBill(/upgrade=|rent=|billing=/.test(location.search)); if (/rent=|upgrade=|billing=|payments=/.test(location.search)) history.replaceState(null, '', '/'); }, [session.token, me?.rooms?.length]);
+  // Coming back from Stripe with the Back button (or from another tab): nothing is stuck on
+  // "Opening…", and the tier and payment status are asked for again, Stripe first.
+  useEffect(() => {
+    const back = () => { setRenting(''); setPayBusy(false); setRentErr(''); setPayErr(''); loadBill(true); loadPay(); load(); };
+    const onShow = (e) => { if (e.persisted) back(); };
+    const onVis = () => { if (document.visibilityState === 'visible') back(); };
+    window.addEventListener('pageshow', onShow); document.addEventListener('visibilitychange', onVis);
+    return () => { window.removeEventListener('pageshow', onShow); document.removeEventListener('visibilitychange', onVis); };
+  }, [session.token]);
   // after a payment or an upgrade, poll briefly until Stripe's webhook has landed, then settle the message
   useEffect(() => {
     if (rentMsg === 'Thank you — the rent is in.') {

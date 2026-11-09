@@ -27,8 +27,21 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
   const ready = !!(stripe && prices.month && prices.day);
   const PLANS = { month: 'month', studio: 'studio', day: 'day' };
   const planOfPrice = (priceId) => (priceId && priceId === prices.studio ? 'studio' : priceId && priceId === prices.month ? 'month' : null);
+  // Which lease a subscription item (or invoice line) is. The env price ids decide; when a price
+  // is not in the env (a second Studio price made in the dashboard, say) its name or amount does,
+  // and the log says so, so the env can be fixed. The $3 payments add-on matches nothing.
+  const planOfItem = (it) => {
+    const price = it.price || {}; const id = price.id || it.pricing?.price_details?.price;
+    let p = planOfPrice(id); if (p) return p;
+    const hint = `${price.nickname || ''} ${price.lookup_key || ''} ${price.product?.name || ''} ${price.metadata?.plan || ''} ${it.description || ''}`.toLowerCase();
+    const amount = price.unit_amount ?? it.pricing?.unit_amount_decimal;
+    if (/studio/.test(hint)) p = 'studio'; else if (/\broom\b|month/.test(hint)) p = 'month';
+    else if (price.recurring && Number(amount) === 2000) p = 'studio'; else if (price.recurring && Number(amount) === 1200) p = 'month';
+    if (p && id) log(`billing: price ${id} is not in the env; read as ${p} from its name or amount`);
+    return p;
+  };
   // the lease among a subscription's items (the $3 payments add-on sits beside it)
-  const planOfItems = (items) => { for (const it of items || []) { const p = planOfPrice(it.price?.id || it.pricing?.price_details?.price); if (p) return p; } return null; };
+  const planOfItems = (items) => { for (const it of items || []) { const p = planOfItem(it); if (p) return p; } return null; };
   const isLease = (plan) => plan === 'month' || plan === 'studio';
   // The tier follows what was paid for. Only called from webhook events.
   const setTier = async (room, plan) => {
@@ -53,17 +66,23 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
     for (const room of rooms) {
       if (!room.stripeSubscriptionId) continue;
       try {
-        const sub = await stripe.subscriptions.retrieve(room.stripeSubscriptionId);
+        const sub = await stripe.subscriptions.retrieve(room.stripeSubscriptionId, { expand: ['items.data.price.product'] });
         const plan = planOfItems(sub.items?.data);
-        if (plan && room.plan !== plan) { room.plan = plan; await room.save(); await setTier(room, plan); }
-        else if (plan && (room.studio !== (plan === 'studio'))) await setTier(room, plan);
+        if (!plan) { log(`billing: sync ${room.slug}: no lease price among ${sub.items?.data?.map((i) => i.price?.id).join(', ')}`); continue; }
+        if (room.plan !== plan) { room.plan = plan; await room.save(); }
+        if (room.studio !== (plan === 'studio')) await setTier(room, plan);
+        else await User.updateOne({ email: room.ownerEmail, studio: { $ne: room.studio } }, { studio: room.studio }).catch(() => {});
       } catch (e) { log(`billing: sync ${room.slug}: ${e.message}`); }
     }
   };
 
-  // What the lobby needs to show the Rent card. ?sync=1 asks Stripe first.
+  // What the lobby needs to show the Rent card. ?sync=1 asks Stripe first; otherwise Stripe is
+  // asked at most once a minute per host, so a switch made in the portal shows up even when the
+  // host came back with the Back button and no webhook reached us.
+  const lastSync = new Map();
   app.get('/api/billing/status', requireAuth, async (req, res) => {
-    if (req.query.sync === '1') await syncLeases(req.user.email);
+    const email = req.user.email, now = Date.now();
+    if (req.query.sync === '1' || now - (lastSync.get(email) || 0) > 60000) { lastSync.set(email, now); await syncLeases(email).catch(() => {}); }
     const rooms = await Room.find({ ownerEmail: req.user.email }).lean();
     res.json({ ready, studioReady: ready && !!prices.studio, prices: { month: 12, studio: 20, day: 2 }, rooms: rooms.map((r) => ({
       slug: r.slug, comped: !r.paidThrough, paidThrough: r.paidThrough, plan: r.plan || '', studio: !!r.studio, open: !r.paidThrough || r.paidThrough.getTime() > Date.now(), subscription: !!r.stripeSubscriptionId
@@ -102,7 +121,7 @@ function attachBilling(app, { stripe, requireAuth, Room, User, webhookSecret, pr
     if (!ready) return notReady(res);
     const room = await ownRoom(req, res); if (!room) return;
     if (!room.stripeCustomerId) return res.status(404).json({ error: 'Nothing to manage yet.' });
-    const s = await stripe.billingPortal.sessions.create({ customer: room.stripeCustomerId, return_url: `${origin}/` });
+    const s = await stripe.billingPortal.sessions.create({ customer: room.stripeCustomerId, return_url: `${origin}/?billing=back` });
     res.json({ url: s.url });
   });
 
