@@ -254,8 +254,12 @@ export default function MyRoom({ session, onOpen }) {
             <div className="chips"><button className={`chip ${edit.locked ? 'on' : ''}`} onClick={() => set('locked', true)}>Locked: guests knock, you admit</button>
               <button className={`chip ${!edit.locked ? 'on' : ''}`} onClick={() => set('locked', false)}>Open: anyone with the link walks in</button></div></div>
           <div className="field"><label>Tip link (optional) — your own PayPal.me, Venmo, Ko-fi, Stripe link…</label><input value={edit.tipLink} placeholder="https://paypal.me/yourname" onChange={(e) => set('tipLink', e.target.value)} /></div>
-          <div className="field"><label>Paid door (optional) — your own payment link. Guests are asked to pay there before knocking; Cove can't check it, so it's on trust. For a price that is enforced before the knock, set up payments and (Studio) a lesson price.</label><input value={edit.payLink} placeholder="https://…" onChange={(e) => set('payLink', e.target.value)} /></div>
-          {edit.payLink && <div className="field"><label>What it costs, in your words</label><input value={edit.payNote} maxLength={80} placeholder="$15 per session, or $50 for four" onChange={(e) => set('payNote', e.target.value)} /></div>}
+          {(() => { const priced = me.studio && pay?.payoutsReady && edit.lessonPrice > 0; return (
+          <div className={priced ? 'greyed' : ''} aria-disabled={priced || undefined}>
+            {priced && <p className="muted" style={{ fontSize: 13, margin: '0 0 8px' }}>These are greyed out because a lesson price of ${(edit.lessonPrice / 100).toString()} is set on the Studio page. Students pay that price at the door, so the trust link below isn't shown to them. Set the lesson price to 0 to use the link instead.</p>}
+            <div className="field"><label>Paid door (optional) — your own payment link. Guests are asked to pay there before knocking; Cove can't check it, so it's on trust. For a price that is enforced before the knock, set up payments and (Studio) a lesson price.</label><input value={edit.payLink} placeholder="https://…" disabled={priced} onChange={(e) => set('payLink', e.target.value)} /></div>
+            {edit.payLink && <div className="field"><label>What it costs, in your words</label><input value={edit.payNote} maxLength={80} placeholder="$15 per session, or $50 for four" disabled={priced} onChange={(e) => set('payNote', e.target.value)} /></div>}
+          </div>); })()}
           </>)}
           {!me.termsAcceptedAt && (
             <label className="agree">

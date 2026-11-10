@@ -553,3 +553,7 @@ input{font-family:inherit;font-size:inherit;color:inherit}
 .pay-card b{font-weight:600}
 .pay-card .row-btns{display:flex;gap:6px;flex-wrap:wrap}
 .door .hint a{color:var(--cyan)}
+
+/* Room-tab trust fields while a Studio lesson price is set */
+.myroom-form .greyed .field{opacity:.45}
+.myroom-form .greyed input:disabled{cursor:not-allowed}
